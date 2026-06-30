@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js'
 import { GY, K } from '../constants'
-import { BA, NA, PA } from '../../engine/AtlasRegistry'
-import { drawStoneWall, drawLantern } from '../drawHelpers'
+import { BA, NA } from '../../engine/AtlasRegistry'
+import { drawStoneWall, drawLantern, makeIncenseBurner } from '../drawHelpers'
 import type { RenderCtx, ZoneLayers } from '../../engine/types'
 
 // ─── Zone 5 — Temple (x: 2160–2700) ─────────────────────────────────────────
@@ -80,5 +80,5 @@ export function buildZone5Temple(layers: ZoneLayers, ctx: RenderCtx): void {
   const oak2 = ctx.nsp(...NA.BONSAI_4); oak2.anchor.set(0.5, 1); oak2.x = 2660; oak2.y = GY; oak2.scale.set(1.00); ysort.addChild(oak2)
   const plum = ctx.nsp(...NA.CHERRY_1); plum.anchor.set(0.5, 1); plum.x = 2175; plum.y = GY; plum.scale.set(0.62); ysort.addChild(plum)
 
-  const inc = ctx.psp(...PA.INCENSE);   inc.anchor.set(0.5, 1);  inc.x  = 2490; inc.y  = GY; inc.scale.set(0.50);  ysort.addChild(inc)
+  const inc = makeIncenseBurner(); inc.x = 2490; inc.y = GY; ysort.addChild(inc)
 }

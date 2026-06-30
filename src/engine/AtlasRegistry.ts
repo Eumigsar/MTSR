@@ -38,14 +38,12 @@ export const BA = {
   RAILING_RED: [358,  658, 101,  57] as const,
 } as const
 
+// New 224×128 props atlas — extracted from reference spec sheet
 export const PA = {
-  STONE_LAN: [29,   24,  58, 126] as const,
-  WELL:      [406,  24, 103, 126] as const,
-  DUMMY_1:   [37,  155,  58, 125] as const,
-  DUMMY_2:   [107, 155,  59, 125] as const,
-  DUMMY_3:   [187, 155,  73, 125] as const,
-  BARREL:    [23,  415,  63, 115] as const,
-  INCENSE:   [855, 840, 140, 143] as const,
+  ROCK_SM:  [0,   48, 16, 16] as const,
+  ROCK_MED: [16,  32, 32, 32] as const,
+  ROCK_LG:  [48,  16, 64, 48] as const,
+  PROP_SM:  [112, 32, 32, 32] as const,
 } as const
 
 // ─── Atlas Registry ───────────────────────────────────────────────────────────

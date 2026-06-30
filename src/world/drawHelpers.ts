@@ -67,6 +67,79 @@ export function drawLantern(cont: PIXI.Container, x: number, y: number) {
   cont.addChild(g)
 }
 
+// ─── Ysort-compatible prop factories ─────────────────────────────────────────
+// Each returns a Container positioned at (0,0) = foot/base centre.
+// Caller sets container.x / container.y to place in world space.
+
+export function makeWell(): PIXI.Container {
+  const c = new PIXI.Container()
+  const g = new PIXI.Graphics()
+  g.rect(-18, -8, 36, 8).fill(K.stone)
+  g.ellipse(0, -8, 18, 6).fill(K.stoneL)
+  g.ellipse(0, -8, 11, 4).fill(K.stoneD)
+  g.rect(-14, -40, 4, 32).fill(K.wood)
+  g.rect( 10, -40, 4, 32).fill(K.wood)
+  g.rect(-16, -44, 32, 4).fill(K.woodD)
+  g.moveTo(0, -40).lineTo(0, -16).stroke({ color: K.woodD, width: 1.5 })
+  g.rect(-5, -26, 10, 8).fill(K.woodL)
+  g.rect(-5, -26, 10, 2).fill(K.woodD)
+  c.addChild(g)
+  return c
+}
+
+export function makeDummy(variant = 0): PIXI.Container {
+  const c = new PIXI.Container()
+  const g = new PIXI.Graphics()
+  g.rect(-10, -4, 20, 4).fill(K.woodD)
+  g.rect( -4, -10,  8, 10).fill(K.woodD)
+  g.rect( -3, -56,  6, 50).fill(K.wood)
+  g.rect(-22, -44, 19, 5).fill(K.woodL)
+  g.rect(  3, -44, 19, 5).fill(K.woodL)
+  const armY = variant === 0 ? -30 : variant === 1 ? -32 : -28
+  g.rect(-16, armY, 13, 4).fill(K.wood)
+  g.rect(  3, armY, 13, 4).fill(K.wood)
+  g.rect( -4, -60,  8, 4).fill(K.woodD)
+  c.addChild(g)
+  return c
+}
+
+export function makeStoneLantern(): PIXI.Container {
+  const c = new PIXI.Container()
+  const g = new PIXI.Graphics()
+  g.rect(-14, -6,  28, 6).fill(K.stoneL)
+  g.rect( -7, -18, 14, 12).fill(K.stone)
+  g.rect(-11, -22, 22, 4).fill(K.stoneL)
+  g.rect( -4, -32,  8, 10).fill(K.stone)
+  g.rect( -9, -36, 18, 4).fill(K.stoneL)
+  g.rect( -7, -52, 14, 16).fill(K.stoneD)
+  g.rect( -5, -50, 10, 12).fill({ color: K.lanG, alpha: 0.40 })
+  g.rect( -9, -56, 18, 4).fill(K.stone)
+  g.ellipse(0, -60, 4, 5).fill(K.stoneL)
+  c.addChild(g)
+  return c
+}
+
+export function makeIncenseBurner(): PIXI.Container {
+  const c = new PIXI.Container()
+  const g = new PIXI.Graphics()
+  g.moveTo(-10, 0).lineTo(-8, -14).stroke({ color: K.stoneD, width: 3 })
+  g.moveTo( 10, 0).lineTo(  8, -14).stroke({ color: K.stoneD, width: 3 })
+  g.moveTo(  0, 0).lineTo(  0, -14).stroke({ color: K.stoneD, width: 3 })
+  g.rect(-14, -44, 28, 30).fill(K.stone)
+  g.rect(-11, -46, 22, 4).fill(K.stoneL)
+  g.rect(-12, -14, 24, 4).fill(K.stoneL)
+  g.rect(-18, -38, 4, 10).fill(K.stoneD)
+  g.rect( 14, -38, 4, 10).fill(K.stoneD)
+  g.moveTo(-4, -44).lineTo(-6, -70).stroke({ color: K.woodD, width: 1.5 })
+  g.moveTo( 0, -44).lineTo( 0, -72).stroke({ color: K.woodD, width: 1.5 })
+  g.moveTo( 4, -44).lineTo( 4, -70).stroke({ color: K.woodD, width: 1.5 })
+  g.ellipse(-6, -70, 3, 2).fill({ color: K.lanG, alpha: 0.60 })
+  g.ellipse( 0, -72, 3, 2).fill({ color: K.lanG, alpha: 0.60 })
+  g.ellipse( 4, -70, 3, 2).fill({ color: K.lanG, alpha: 0.60 })
+  c.addChild(g)
+  return c
+}
+
 export function drawSign(cont: PIXI.Container, x: number, y: number, text: string) {
   const g = new PIXI.Graphics()
   g.rect(x - 2,  y - 80, 4,  80).fill(K.woodD)

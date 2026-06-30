@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js'
 import { GY, K, rng } from '../constants'
-import { BA, NA, PA } from '../../engine/AtlasRegistry'
-import { drawStoneWall, drawLantern } from '../drawHelpers'
+import { BA, NA } from '../../engine/AtlasRegistry'
+import { drawStoneWall, drawLantern, makeWell, makeDummy, makeStoneLantern } from '../drawHelpers'
 import type { RenderCtx, ZoneLayers } from '../../engine/types'
 
 // ─── Zone 1 — Martial Academy 武德堂 (x: 0–540) ──────────────────────────────
@@ -197,20 +197,20 @@ export function buildZone1Academy(layers: ZoneLayers, ctx: RenderCtx): void {
   // ── Well (back of training area) ──────────────────────────────────
   // Set back at y=720 — appears behind the dummies. Functional prop,
   // not decoration: students drink water between training sessions.
-  const well = ctx.psp(...PA.WELL); well.anchor.set(0.5, 1); well.x = 170; well.y = 720; well.scale.set(0.52); ysort.addChild(well)
+  const well = makeWell(); well.x = 170; well.y = 720; ysort.addChild(well)
 
   // ── Training dummies — three in deliberate formation ──────────────
   // Evenly spaced 38 px apart at y=GY. The gap between them is intentional:
   // a student steps between the dummies to attack each in sequence.
-  const d1 = ctx.psp(...PA.DUMMY_1); d1.anchor.set(0.5, 1); d1.x = 178; d1.y = GY; d1.scale.set(0.60); ysort.addChild(d1)
-  const d2 = ctx.psp(...PA.DUMMY_2); d2.anchor.set(0.5, 1); d2.x = 216; d2.y = GY; d2.scale.set(0.60); ysort.addChild(d2)
-  const d3 = ctx.psp(...PA.DUMMY_3); d3.anchor.set(0.5, 1); d3.x = 254; d3.y = GY; d3.scale.set(0.60); ysort.addChild(d3)
+  const d1 = makeDummy(0); d1.x = 178; d1.y = GY; ysort.addChild(d1)
+  const d2 = makeDummy(1); d2.x = 216; d2.y = GY; ysort.addChild(d2)
+  const d3 = makeDummy(2); d3.x = 254; d3.y = GY; ysort.addChild(d3)
 
   // ── Stone lanterns flanking main hall entrance ────────────────────
   // Placed at y=GY and added after the hall: they render in front of
   // the hall's lower facade, appearing to stand on the steps.
-  const slanL = ctx.psp(...PA.STONE_LAN); slanL.anchor.set(0.5, 1); slanL.x = 382; slanL.y = GY; slanL.scale.set(0.50); ysort.addChild(slanL)
-  const slanR = ctx.psp(...PA.STONE_LAN); slanR.anchor.set(0.5, 1); slanR.x = 484; slanR.y = GY; slanR.scale.set(0.50); ysort.addChild(slanR)
+  const slanL = makeStoneLantern(); slanL.x = 382; slanL.y = GY; ysort.addChild(slanL)
+  const slanR = makeStoneLantern(); slanR.x = 484; slanR.y = GY; ysort.addChild(slanR)
 
   // ── Bonsai meditation garden (east section) ───────────────────────
   // Three bonsais in a composed group — not symmetrical, not scattered.
