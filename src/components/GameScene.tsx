@@ -3,7 +3,7 @@ import * as PIXI from 'pixi.js'
 import { useGameStore } from '../stores/gameStore'
 import { TONE_COLORS } from '../types'
 import type { HanziData } from '../types'
-import { W, H, WW, WH, GY, FW, FH, K } from '../world/constants'
+import { W, H, WW, WH, GY, K } from '../world/constants'
 import { RenderPipeline } from '../engine/RenderPipeline'
 import { AtlasRegistry } from '../engine/AtlasRegistry'
 import { buildSky, buildMountains, buildWorld } from '../world/buildWorld'
@@ -66,13 +66,16 @@ export function GameScene() {
         AtlasRegistry.loadWalkTex('/assets/chars-atlas1.png'),
       ])
 
-      // Atlas grid: 12 chars wide × 8 chars tall, each char = 128×128 px (4 frames × 4 dirs)
+      // Atlas: 12 cols × 8 rows, each slot = 128×128 px (one complete sprite).
+      // Row layout per character group (4 rows): 0=Down, 1=Left, 2=Up, 3=Right.
+      // charIdx 0-11 use rows 0-3; charIdx 12-23 use rows 4-7.
       const mkAtlasFrames = (tex: PIXI.Texture, charIdx: number, dir: number): PIXI.Texture[] => {
-        const col = charIdx % 12, row = Math.floor(charIdx / 12)
-        return [0, 1, 2, 3].map(f => new PIXI.Texture({
+        const col = charIdx % 12
+        const rowBase = Math.floor(charIdx / 12) * 4
+        return [new PIXI.Texture({
           source: tex.source,
-          frame: new PIXI.Rectangle((col * 4 + f) * FW, (row * 4 + dir) * FH, FW, FH),
-        }))
+          frame: new PIXI.Rectangle(col * 128, (rowBase + dir) * 128, 128, 128),
+        })]
       }
 
       // ── Render pipeline ────────────────────────────────────────
@@ -89,7 +92,7 @@ export function GameScene() {
       npc.x = 290; npc.y = GY
       npc.eventMode = 'static'; npc.cursor = 'pointer'
       const sifuSpr = new PIXI.AnimatedSprite(mkAtlasFrames(charsTex, 1, 0))
-      sifuSpr.anchor.set(0.5, 1); sifuSpr.scale.set(2.5); sifuSpr.animationSpeed = 0.05; sifuSpr.play()
+      sifuSpr.anchor.set(0.5, 1); sifuSpr.scale.set(0.625); sifuSpr.play()
       const npcLbl = new PIXI.Text({ text: '師父 Liang', style: { fontSize: 9, fill: '#C9A84C', fontFamily: 'Georgia,serif' } })
       npcLbl.anchor.set(0.5, 0); npcLbl.y = 4
       npc.addChild(sifuSpr, npcLbl)
@@ -116,10 +119,10 @@ export function GameScene() {
         const wc = new PIXI.Container()
         wc.x = z.x; wc.y = GY
         const leftFrames  = mkAtlasFrames(chars1Tex, i, 1)
-        const rightFrames = mkAtlasFrames(chars1Tex, i, 2)
+        const rightFrames = mkAtlasFrames(chars1Tex, i, 3)
         const initRight = i % 2 === 0
         const wSpr = new PIXI.AnimatedSprite(initRight ? rightFrames : leftFrames)
-        wSpr.anchor.set(0.5, 1); wSpr.scale.set(2.5); wSpr.animationSpeed = 0.1; wSpr.play()
+        wSpr.anchor.set(0.5, 1); wSpr.scale.set(0.625); wSpr.play()
         wc.addChild(wSpr)
         ysortLay.addChild(wc)
         walkers.push({ cont: wc, dir: initRight ? 1 : -1, spd: 0.5 + Math.random() * 0.4, min: z.min, max: z.max, t: Math.random() * 200, spr: wSpr, leftFrames, rightFrames })
@@ -169,7 +172,7 @@ export function GameScene() {
       // ── Dragon (viewport-fixed, behind world) ──────────────────
       const dragonFrames = mkAtlasFrames(chars1Tex, 8, 0)
       const dragonSpr = new PIXI.AnimatedSprite(dragonFrames)
-      dragonSpr.anchor.set(0.5, 0.5); dragonSpr.scale.set(3.8); dragonSpr.animationSpeed = 0.09; dragonSpr.play()
+      dragonSpr.anchor.set(0.5, 0.5); dragonSpr.scale.set(0.95); dragonSpr.play()
       dragonSpr.x = 700; dragonSpr.y = Math.round(H * 0.42)
       skyLay.addChild(dragonSpr)
 
@@ -178,13 +181,13 @@ export function GameScene() {
       playerShadow.ellipse(0, 0, 20, 7).fill({ color: 0x000000, alpha: 0.18 })
 
       const playerFrames = {
-        down:  mkAtlasFrames(charsTex, 0, 0),
-        left:  mkAtlasFrames(charsTex, 0, 1),
-        right: mkAtlasFrames(charsTex, 0, 2),
-        up:    mkAtlasFrames(charsTex, 0, 3),
+        down:  mkAtlasFrames(charsTex, 0, 0),  // row 0 = front
+        left:  mkAtlasFrames(charsTex, 0, 1),  // row 1 = left
+        up:    mkAtlasFrames(charsTex, 0, 2),  // row 2 = back
+        right: mkAtlasFrames(charsTex, 0, 3),  // row 3 = right
       }
       const playerSpr = new PIXI.AnimatedSprite(playerFrames.down)
-      playerSpr.anchor.set(0.5, 1.0); playerSpr.scale.set(2.5); playerSpr.animationSpeed = 0.12; playerSpr.play()
+      playerSpr.anchor.set(0.5, 1.0); playerSpr.scale.set(0.625); playerSpr.play()
 
       const player = new PIXI.Container()
       player.addChild(playerSpr)
