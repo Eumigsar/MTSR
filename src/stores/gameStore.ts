@@ -145,7 +145,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
 
     // ── Persist to Supabase (skip demo) ───────────────────
-    if (!IS_DEMO(character.id)) {
+    if (!IS_DEMO(character.id) && supabase) {
       await Promise.all([
         supabase.from('characters').update({
           xp: newXp, level: newLevel, yuan: newYuan, qi: newQi,
@@ -178,7 +178,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       stat_points: character.stat_points - 1,
     }
     set({ character: updated })
-    if (!IS_DEMO(character.id)) {
+    if (!IS_DEMO(character.id) && supabase) {
       await supabase.from('characters').update({ [stat]: updated[stat as keyof PlayerCharacter], stat_points: updated.stat_points }).eq('id', character.id)
     }
   },
@@ -199,7 +199,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       }),
     }))
 
-    if (!IS_DEMO(character.id)) {
+    if (!IS_DEMO(character.id) && supabase) {
       if (prev) await supabase.from('player_inventory').update({ equipped: false, equipped_slot: null }).eq('id', prev.inventoryId)
       await supabase.from('player_inventory').update({ equipped: true, equipped_slot: slot }).eq('id', inv.inventoryId)
     }
@@ -214,7 +214,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       equipment: { ...s.equipment, [slot]: undefined },
       inventory: s.inventory.map((i) => i.inventoryId === inv.inventoryId ? { ...i, equipped: false, equippedSlot: undefined } : i),
     }))
-    if (!IS_DEMO(character.id)) {
+    if (!IS_DEMO(character.id) && supabase) {
       await supabase.from('player_inventory').update({ equipped: false, equipped_slot: null }).eq('id', inv.inventoryId)
     }
   },
@@ -242,7 +242,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       unlockedTalents: new Set([...s.unlockedTalents, talentId]),
       character: s.character ? { ...s.character, talent_points: s.character.talent_points - 1 } : null,
     }))
-    if (!IS_DEMO(character.id)) {
+    if (!IS_DEMO(character.id) && supabase) {
       await Promise.all([
         supabase.from('player_talents').insert({ character_id: character.id, talent_id: talentId }),
         supabase.from('characters').update({ talent_points: character.talent_points - 1 }).eq('id', character.id),
@@ -259,7 +259,7 @@ export const useGameStore = create<GameState>((set, get) => ({
     const inventoryId = `local-${Date.now()}-${itemId}`
     const inv: InventoryItem = { inventoryId, item, quantity, equipped: false }
     set((s) => ({ inventory: [...s.inventory, inv] }))
-    if (!IS_DEMO(character.id)) {
+    if (!IS_DEMO(character.id) && supabase) {
       const { data } = await supabase.from('player_inventory').insert({ character_id: character.id, item_id: itemId, quantity }).select().single()
       if (data) {
         set((s) => ({ inventory: s.inventory.map((i) => i.inventoryId === inventoryId ? { ...i, inventoryId: data.id } : i) }))
@@ -273,7 +273,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       get().loadLearningProgress(characterId),
       // inventory
       (async () => {
-        const { data } = await supabase.from('player_inventory').select('*, items(*)').eq('character_id', characterId)
+        const { data } = await supabase!.from('player_inventory').select('*, items(*)').eq('character_id', characterId)
         if (!data) return
         const invItems: InventoryItem[] = data.map((row) => {
           const catalogItem = ITEM_CATALOG.find((i) => i.id === row.item_id) ?? row.items
@@ -287,14 +287,14 @@ export const useGameStore = create<GameState>((set, get) => ({
       })(),
       // talents
       (async () => {
-        const { data } = await supabase.from('player_talents').select('talent_id').eq('character_id', characterId)
+        const { data } = await supabase!.from('player_talents').select('talent_id').eq('character_id', characterId)
         if (data) set({ unlockedTalents: new Set(data.map((r) => r.talent_id)) })
       })(),
     ])
   },
 
   loadLearningProgress: async (characterId) => {
-    const { data } = await supabase.from('player_learning_stats').select('*').eq('character_id', characterId)
+    const { data } = await supabase!.from('player_learning_stats').select('*').eq('character_id', characterId)
     if (!data) return
     const records = new Map<string, LearningRecord>()
     const mastered = new Set<string>()

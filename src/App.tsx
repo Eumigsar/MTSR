@@ -48,6 +48,7 @@ export default function App() {
 
   // ── Auth state ─────────────────────────────────────────────
   useEffect(() => {
+    if (!supabase) { setSession(null); return }
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
     const { data: listener } = supabase.auth.onAuthStateChange((_e, s) => setSession(s))
     return () => listener.subscription.unsubscribe()
@@ -55,11 +56,11 @@ export default function App() {
 
   // ── Bootstrap character when session changes ───────────────
   useEffect(() => {
-    if (!session || session === 'loading' || isDemo) return
+    if (!session || session === 'loading' || isDemo || !supabase) return
     const userId = session.user.id
 
     const bootstrap = async () => {
-      const { data: chars } = await supabase
+      const { data: chars } = await supabase!
         .from('characters')
         .select('*')
         .eq('user_id', userId)
@@ -73,7 +74,7 @@ export default function App() {
           session.user.user_metadata?.username ||
           session.user.email?.split('@')[0] ||
           'Novo Discípulo'
-        const { data: created } = await supabase
+        const { data: created } = await supabase!
           .from('characters')
           .insert({ user_id: userId, name, yuan: 100 })
           .select()

@@ -17,6 +17,7 @@ export function AuthScreen({ onDemo }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!supabase) { setError('Supabase não configurado — use o Modo Demo.'); return }
     setError(null); setSuccess(null); setLoading(true)
     if (mode === 'signup') {
       const { error: err } = await supabase.auth.signUp({
