@@ -114,6 +114,11 @@ export class AtlasRegistry {
     return AtlasRegistry.loadTex(src)
   }
 
+  // Load a character atlas that has a solid background (grey ~234) requiring removal.
+  static loadCharAtlas(src: string): Promise<PIXI.Texture> {
+    return AtlasRegistry.loadAndRemoveBg(src)
+  }
+
   // Build a RenderCtx with factory functions backed by the loaded textures.
   buildCtx(): RenderCtx {
     const crop = (tex: PIXI.Texture, x: number, y: number, w: number, h: number): PIXI.Sprite =>

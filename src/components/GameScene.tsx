@@ -61,22 +61,19 @@ export function GameScene() {
       await registry.load()
       const ctx = registry.buildCtx()
 
-      const [playerWalkTex, sifuWalkTex, grandmaWalkTex, huaWalkTex, wenWalkTex, wuWalkTex,
-             jadeWalkTex, redWalkTex, dragonTex] =
-        await Promise.all([
-          AtlasRegistry.loadWalkTex('/assets/player_apprentice_blue_walk.png'),
-          AtlasRegistry.loadWalkTex('/assets/sifu_liang_walk.png'),
-          AtlasRegistry.loadWalkTex('/assets/grandma_zhang_walk.png'),
-          AtlasRegistry.loadWalkTex('/assets/hua_lan_walk.png'),
-          AtlasRegistry.loadWalkTex('/assets/wen_bo_walk.png'),
-          AtlasRegistry.loadWalkTex('/assets/little_wu_walk.png'),
-          AtlasRegistry.loadWalkTex('/assets/player_apprentice_jade_walk.png'),
-          AtlasRegistry.loadWalkTex('/assets/player_apprentice_red_walk.png'),
-          AtlasRegistry.loadWalkTex('/assets/xiao_long_paper_dragon_float.png'),
-        ])
+      const [charsTex, chars1Tex] = await Promise.all([
+        AtlasRegistry.loadCharAtlas('/assets/chars-atlas.png'),
+        AtlasRegistry.loadWalkTex('/assets/chars-atlas1.png'),
+      ])
 
-      const mkFrames = (tex: PIXI.Texture, row: number): PIXI.Texture[] =>
-        [0, 1, 2, 3].map(col => new PIXI.Texture({ source: tex.source, frame: new PIXI.Rectangle(col * FW, row * FH, FW, FH) }))
+      // Atlas grid: 12 chars wide × 8 chars tall, each char = 128×128 px (4 frames × 4 dirs)
+      const mkAtlasFrames = (tex: PIXI.Texture, charIdx: number, dir: number): PIXI.Texture[] => {
+        const col = charIdx % 12, row = Math.floor(charIdx / 12)
+        return [0, 1, 2, 3].map(f => new PIXI.Texture({
+          source: tex.source,
+          frame: new PIXI.Rectangle((col * 4 + f) * FW, (row * 4 + dir) * FH, FW, FH),
+        }))
+      }
 
       // ── Render pipeline ────────────────────────────────────────
       const pipeline = new RenderPipeline(app.stage)
@@ -91,7 +88,7 @@ export function GameScene() {
       const npc = new PIXI.Container()
       npc.x = 290; npc.y = GY
       npc.eventMode = 'static'; npc.cursor = 'pointer'
-      const sifuSpr = new PIXI.AnimatedSprite(mkFrames(sifuWalkTex, 0))
+      const sifuSpr = new PIXI.AnimatedSprite(mkAtlasFrames(charsTex, 1, 0))
       sifuSpr.anchor.set(0.5, 1); sifuSpr.scale.set(2.5); sifuSpr.animationSpeed = 0.05; sifuSpr.play()
       const npcLbl = new PIXI.Text({ text: '師父 Liang', style: { fontSize: 9, fill: '#C9A84C', fontFamily: 'Georgia,serif' } })
       npcLbl.anchor.set(0.5, 0); npcLbl.y = 4
@@ -107,7 +104,6 @@ export function GameScene() {
         spr: PIXI.AnimatedSprite; leftFrames: PIXI.Texture[]; rightFrames: PIXI.Texture[]
       }
       const walkers: WalkNPC[] = []
-      const npcWalkTexes = [grandmaWalkTex, huaWalkTex, wenWalkTex, wuWalkTex, jadeWalkTex, redWalkTex]
       const npcZones = [
         { x: 230,  min: 130,  max: 420  },
         { x: 1180, min: 1140, max: 1280 },
@@ -119,9 +115,8 @@ export function GameScene() {
       npcZones.forEach((z, i) => {
         const wc = new PIXI.Container()
         wc.x = z.x; wc.y = GY
-        const wTex = npcWalkTexes[i % npcWalkTexes.length]
-        const leftFrames  = mkFrames(wTex, 1)
-        const rightFrames = mkFrames(wTex, 2)
+        const leftFrames  = mkAtlasFrames(chars1Tex, i, 1)
+        const rightFrames = mkAtlasFrames(chars1Tex, i, 2)
         const initRight = i % 2 === 0
         const wSpr = new PIXI.AnimatedSprite(initRight ? rightFrames : leftFrames)
         wSpr.anchor.set(0.5, 1); wSpr.scale.set(2.5); wSpr.animationSpeed = 0.1; wSpr.play()
@@ -172,9 +167,7 @@ export function GameScene() {
       }
 
       // ── Dragon (viewport-fixed, behind world) ──────────────────
-      const dragonFrames = [0, 1, 2, 3].map(col =>
-        new PIXI.Texture({ source: dragonTex.source, frame: new PIXI.Rectangle(col * 32, 0, 32, 32) })
-      )
+      const dragonFrames = mkAtlasFrames(chars1Tex, 8, 0)
       const dragonSpr = new PIXI.AnimatedSprite(dragonFrames)
       dragonSpr.anchor.set(0.5, 0.5); dragonSpr.scale.set(3.8); dragonSpr.animationSpeed = 0.09; dragonSpr.play()
       dragonSpr.x = 700; dragonSpr.y = Math.round(H * 0.42)
@@ -185,10 +178,10 @@ export function GameScene() {
       playerShadow.ellipse(0, 0, 20, 7).fill({ color: 0x000000, alpha: 0.18 })
 
       const playerFrames = {
-        down:  mkFrames(playerWalkTex, 0),
-        left:  mkFrames(playerWalkTex, 1),
-        right: mkFrames(playerWalkTex, 2),
-        up:    mkFrames(playerWalkTex, 3),
+        down:  mkAtlasFrames(charsTex, 0, 0),
+        left:  mkAtlasFrames(charsTex, 0, 1),
+        right: mkAtlasFrames(charsTex, 0, 2),
+        up:    mkAtlasFrames(charsTex, 0, 3),
       }
       const playerSpr = new PIXI.AnimatedSprite(playerFrames.down)
       playerSpr.anchor.set(0.5, 1.0); playerSpr.scale.set(2.5); playerSpr.animationSpeed = 0.12; playerSpr.play()
