@@ -7,6 +7,7 @@ import { W, H, WW, WH, GY, K } from '../world/constants'
 import { RenderPipeline } from '../engine/RenderPipeline'
 import { AtlasRegistry } from '../engine/AtlasRegistry'
 import { buildSky, buildMountains, buildWorld } from '../world/buildWorld'
+import { LandmarkRenderer } from '../world/LandmarkRenderer'
 import { moveInput, DEAD_ZONE, RUN_THRESHOLD, RUN_SPEED_MULT } from '../input/InputState'
 import { MobileControls } from '../input/MobileControls'
 
@@ -85,6 +86,7 @@ export function GameScene() {
       // ── Build world ────────────────────────────────────────────
       buildSky(skyLay)
       buildMountains(pipeline.layers.mountains)
+      const landmark = new LandmarkRenderer(pipeline.layers.mountains)
       buildWorld(pipeline.layers, ctx)
 
       // ── NPC Sifu Liang ─────────────────────────────────────────
@@ -314,6 +316,7 @@ export function GameScene() {
 
         // World scroll + parallax + Y-sort (all in one pipeline call)
         pipeline.update(camX, camY)
+        landmark.update(camX)
 
         // NPC float
         npc.y = GY + Math.sin(t * 0.02) * 3
