@@ -178,12 +178,9 @@ export function GameScene() {
         ysortLay.addChild(orb)
       }
 
-      // ── Dragon (viewport-fixed, behind world) ──────────────────
-      const dragonFrames = mkAtlasFrames(chars1Tex, 8, 0)
-      const dragonSpr = new PIXI.AnimatedSprite(dragonFrames)
-      dragonSpr.anchor.set(0.5, 0.5); dragonSpr.scale.set(0.95); dragonSpr.play()
-      dragonSpr.x = 700; dragonSpr.y = Math.round(H * 0.42)
-      skyLay.addChild(dragonSpr)
+      // ── Dragon — serpentine silhouette, viewport-fixed ─────────
+      const dragonG = new PIXI.Graphics()
+      skyLay.addChild(dragonG)
 
       // ── Player ─────────────────────────────────────────────────
       const playerShadow = new PIXI.Graphics()
@@ -363,8 +360,18 @@ export function GameScene() {
         // Dragon ambient flight — loops across full world width
         dragonWX += 0.55 * tk.deltaTime
         if (dragonWX > WW + 160) dragonWX = -160
-        dragonSpr.x = dragonWX
-        dragonSpr.y = Math.round(H * 0.42) + Math.sin(t * 0.016) * 16
+        const dBaseY = Math.round(H * 0.42)
+        dragonG.clear()
+        for (let s = 9; s >= 0; s--) {
+          const sx = dragonWX - s * 14
+          const sy = dBaseY + Math.sin(t * 0.016 + s * 0.42) * 14
+          const r  = Math.max(1.5, 5.5 - s * 0.45)
+          dragonG.ellipse(sx, sy, r * 2.2, r).fill({ color: 0x1A2848, alpha: Math.max(0.08, 0.65 - s * 0.06) })
+        }
+        // Head horns
+        const hx = dragonWX, hy = dBaseY + Math.sin(t * 0.016) * 14
+        dragonG.poly([hx + 6, hy - 4, hx + 11, hy - 11, hx + 9, hy - 2]).fill({ color: 0x2A3A58, alpha: 0.6 })
+        dragonG.poly([hx + 2, hy - 5, hx + 5,  hy - 12, hx + 4, hy - 2]).fill({ color: 0x2A3A58, alpha: 0.6 })
 
         // Birds
         birds.forEach((b) => {
