@@ -133,11 +133,11 @@ export function HUD() {
         </button>
       </div>
 
-      {/* ── Bottom center: Controls hint ─────────────────── */}
+      {/* ── Bottom center: Lesson hint ───────────────────── */}
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
         <div className="bg-matsuri-ink/60 backdrop-blur-sm rounded-full px-4 py-1.5">
           <p className="text-[9px] text-matsuri-paper/40 tracking-widest uppercase">
-            WASD / ↑↓←→ mover · Clique nos orbes · 👤🎒🌳 painéis
+            Dojo da Mestre Chin · 👤🎒🌳 painéis
           </p>
         </div>
       </div>

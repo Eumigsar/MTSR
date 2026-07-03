@@ -1,455 +1,654 @@
-import { useEffect, useRef, useState } from 'react'
-import * as PIXI from 'pixi.js'
+import { useState, useEffect, useRef } from 'react'
 import { useGameStore } from '../stores/gameStore'
-import { TONE_COLORS } from '../types'
-import type { HanziData } from '../types'
-import { W, H, WW, WH, GY, K } from '../world/constants'
-import { RenderPipeline } from '../engine/RenderPipeline'
-import { AtlasRegistry } from '../engine/AtlasRegistry'
-import { buildSky, buildMountains, buildWorld } from '../world/buildWorld'
-import { LandmarkRenderer } from '../world/LandmarkRenderer'
-import { moveInput, DEAD_ZONE, RUN_THRESHOLD, RUN_SPEED_MULT } from '../input/InputState'
-import { MobileControls } from '../input/MobileControls'
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GameScene — orchestrates PIXI app, loads assets, places entities.
-// World content (zones, sky, mountains) lives in src/world/.
-// Render layer management lives in src/engine/RenderPipeline.ts.
-// ─────────────────────────────────────────────────────────────────────────────
+import { CURRICULUM } from '../rpg/curriculum'
+import type { Lesson, MasterAction } from '../rpg/curriculum'
 
-type OrbData = HanziData & { wx: number; wy: number }
-
-const ORBS: OrbData[] = [
-  { hanzi: '一', pinyin: 'yī',  pinyin_base: 'yi',  tone: 1, meaning_pt: 'um',     hsk_level: 1, stroke_count: 1, wx: 350,  wy: 790,
-    etymology: 'Um único traço horizontal — o início de toda jornada.' },
-  { hanzi: '二', pinyin: 'èr',  pinyin_base: 'er',  tone: 2, meaning_pt: 'dois',   hsk_level: 1, stroke_count: 2, wx: 870,  wy: 750,
-    etymology: 'Dois traços: Céu acima, Terra abaixo.' },
-  { hanzi: '三', pinyin: 'sān', pinyin_base: 'san', tone: 1, meaning_pt: 'três',   hsk_level: 1, stroke_count: 3, wx: 1450, wy: 780,
-    etymology: 'Três traços: Céu, Humanidade e Terra.' },
-  { hanzi: '四', pinyin: 'sì',  pinyin_base: 'si',  tone: 4, meaning_pt: 'quatro', hsk_level: 1, stroke_count: 5, wx: 2080, wy: 680,
-    etymology: 'Uma boca dentro de um quadrado: os quatro cantos do mundo.' },
-  { hanzi: '五', pinyin: 'wǔ',  pinyin_base: 'wu',  tone: 3, meaning_pt: 'cinco',  hsk_level: 1, stroke_count: 4, wx: 2510, wy: 770,
-    etymology: 'Os Cinco Elementos em equilíbrio.' },
-]
-
-export function GameScene() {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const openLearningRef = useRef(useGameStore.getState().openLearning)
-  const masteredRef    = useRef(useGameStore.getState().masteredHanzi)
-  const [npcText, setNpcText] = useState<string | null>(null)
-
-  useEffect(() => {
-    return useGameStore.subscribe((s) => {
-      openLearningRef.current = s.openLearning
-      masteredRef.current     = s.masteredHanzi
-    })
-  }, [])
-
-  useEffect(() => {
-    if (!containerRef.current) return
-    let app: PIXI.Application
-    let destroyed = false
-    const keys: Record<string, boolean> = {}
-
-    const init = async () => {
-      app = new PIXI.Application()
-      await app.init({ width: W, height: H, background: 0x8ABCD8, antialias: true })
-      if (!containerRef.current || destroyed) return
-      containerRef.current.appendChild(app.canvas as HTMLCanvasElement)
-
-      // ── Atlas loading ──────────────────────────────────────────
-      const registry = new AtlasRegistry()
-      await registry.load()
-      const ctx = registry.buildCtx()
-
-      const [charsTex, chars1Tex] = await Promise.all([
-        AtlasRegistry.loadCharAtlas('/assets/chars-atlas.png'),
-        AtlasRegistry.loadWalkTex('/assets/chars-atlas1.png'),
-      ])
-
-      // Atlas: 12 cols × 8 rows, each slot = 128×128 px (one complete sprite).
-      // Row layout per character group (4 rows): 0=Down, 1=Left, 2=Up, 3=Right.
-      // charIdx 0-11 use rows 0-3; charIdx 12-23 use rows 4-7.
-      const mkAtlasFrames = (tex: PIXI.Texture, charIdx: number, dir: number): PIXI.Texture[] => {
-        const col = charIdx % 12
-        const rowBase = Math.floor(charIdx / 12) * 4
-        return [new PIXI.Texture({
-          source: tex.source,
-          frame: new PIXI.Rectangle(col * 128, (rowBase + dir) * 128, 128, 128),
-        })]
-      }
-
-      // ── Render pipeline ────────────────────────────────────────
-      const pipeline = new RenderPipeline(app.stage)
-      const { sky: skyLay, ysort: ysortLay, particles: partLay } = pipeline.layers
-
-      // ── Build world ────────────────────────────────────────────
-      buildSky(skyLay)
-      buildMountains(pipeline.layers.mountains)
-      const landmark = new LandmarkRenderer(pipeline.layers.mountains)
-      buildWorld(pipeline.layers, ctx)
-
-      // ── NPC Sifu Liang ─────────────────────────────────────────
-      const npc = new PIXI.Container()
-      npc.x = 290; npc.y = GY
-      npc.eventMode = 'static'; npc.cursor = 'pointer'
-      const sifuSpr = new PIXI.AnimatedSprite(mkAtlasFrames(charsTex, 1, 0))
-      sifuSpr.anchor.set(0.5, 1); sifuSpr.scale.set(0.625); sifuSpr.play()
-      const npcLbl = new PIXI.Text({ text: '師父 Liang', style: { fontSize: 9, fill: '#C9A84C', fontFamily: 'Georgia,serif' } })
-      npcLbl.anchor.set(0.5, 0); npcLbl.y = 4
-      npc.addChild(sifuSpr, npcLbl)
-      npc.on('pointerover', () => { sifuSpr.tint = 0xFFEECC })
-      npc.on('pointerout',  () => { sifuSpr.tint = 0xFFFFFF })
-      npc.on('pointerdown', () => setNpcText('Discípulo... os pergaminhos dos números aguardam. Encontre os cinco orbes de Hanzi espalhados por este mundo — da Academia até o Templo Antigo. Apenas o cultivo verdadeiro desperta o Qi interior.'))
-      ysortLay.addChild(npc)
-
-      // ── Wandering NPCs ─────────────────────────────────────────
-      interface WalkNPC {
-        cont: PIXI.Container; dir: number; spd: number; min: number; max: number; t: number
-        spr: PIXI.AnimatedSprite; leftFrames: PIXI.Texture[]; rightFrames: PIXI.Texture[]
-      }
-      const walkers: WalkNPC[] = []
-      // charIdx map — chars-atlas1.png: 0=grandma_zhang 1=hua_lan 2=wen_bo 3=little_wu 4=jade 5=red
-      const npcZones = [
-        { x:  350, min:  280, max:  470, charIdx: 2 }, // wen_bo disciple  — Zone 1
-        { x:   80, min:   60, max:  150, charIdx: 5 }, // red guard west   — Zone 1 gate
-        { x:  490, min:  460, max:  530, charIdx: 5 }, // red guard east   — Zone 1 gate
-        { x:  650, min:  580, max:  780, charIdx: 4 }, // jade pilgrim     — Zone 2 west
-        { x:  900, min:  820, max:  980, charIdx: 4 }, // jade pilgrim     — Zone 2 east
-        { x: 1200, min: 1160, max: 1280, charIdx: 0 }, // grandma_zhang    — Zone 3 market
-        { x: 1380, min: 1340, max: 1430, charIdx: 1 }, // hua_lan          — Zone 3 library
-        { x: 1480, min: 1440, max: 1520, charIdx: 3 }, // little_wu        — Zone 3 stalls
-        { x: 1750, min: 1680, max: 1850, charIdx: 4 }, // jade pilgrim     — Zone 4 lower
-        { x: 1960, min: 1900, max: 2060, charIdx: 4 }, // jade pilgrim     — Zone 4 upper
-        { x: 2260, min: 2220, max: 2320, charIdx: 5 }, // red guard west   — Zone 5
-        { x: 2590, min: 2540, max: 2650, charIdx: 5 }, // red guard east   — Zone 5
-      ]
-      npcZones.forEach((z, i) => {
-        const wc = new PIXI.Container()
-        wc.x = z.x; wc.y = GY
-        const leftFrames  = mkAtlasFrames(chars1Tex, z.charIdx, 1)
-        const rightFrames = mkAtlasFrames(chars1Tex, z.charIdx, 3)
-        const initRight = i % 2 === 0
-        const wSpr = new PIXI.AnimatedSprite(initRight ? rightFrames : leftFrames)
-        wSpr.anchor.set(0.5, 1); wSpr.scale.set(0.625); wSpr.play()
-        wc.addChild(wSpr)
-        ysortLay.addChild(wc)
-        walkers.push({ cont: wc, dir: initRight ? 1 : -1, spd: 0.5 + Math.random() * 0.4, min: z.min, max: z.max, t: Math.random() * 200, spr: wSpr, leftFrames, rightFrames })
-      })
-
-      // ── Orbs ───────────────────────────────────────────────────
-      for (let i = 0; i < ORBS.length; i++) {
-        const h = ORBS[i]
-        const tColorHex = parseInt(TONE_COLORS[h.tone].hex.replace('#', '0x'), 16)
-        const baseY = h.wy
-        const orb = new PIXI.Container()
-        orb.x = h.wx; orb.y = baseY
-        orb.eventMode = 'static'; orb.cursor = 'pointer'
-
-        const glow = new PIXI.Graphics()
-        glow.circle(0, 0, 40).fill({ color: tColorHex, alpha: 0.15 })
-
-        const lanternSpr = ctx.tsp(353, 393, 58, 140)
-        lanternSpr.anchor.set(0.5, 0.5)
-        lanternSpr.scale.set(0.58)
-
-        const charText = new PIXI.Text({ text: h.hanzi, style: { fontSize: 22, fill: '#FFF5D5', fontFamily: '"Noto Serif SC",serif', fontWeight: '700' } })
-        charText.anchor.set(0.5); charText.y = -62
-
-        const pinText = new PIXI.Text({ text: h.pinyin, style: { fontSize: 9, fill: '#FFE8B0', fontFamily: 'Georgia,serif' } })
-        pinText.anchor.set(0.5, 0); pinText.y = -44; pinText.alpha = 0.9
-
-        const star = new PIXI.Text({ text: '★', style: { fontSize: 14, fill: '#C9A84C' } })
-        star.anchor.set(0.5); star.x = 22; star.y = -70; star.visible = false
-
-        orb.addChild(glow, lanternSpr, charText, pinText, star)
-        orb.on('pointerover', () => { orb.scale.set(1.1) })
-        orb.on('pointerout',  () => { orb.scale.set(1.0) })
-        orb.on('pointerdown', () => openLearningRef.current(h))
-
-        const phase = (i / ORBS.length) * Math.PI * 2
-        let orbT = phase
-        app.ticker.add((tk) => {
-          orbT += tk.deltaTime * 0.022
-          orb.y = baseY + Math.sin(orbT) * 7
-          glow.alpha = 0.08 + Math.abs(Math.sin(orbT * 0.6)) * 0.1
-          star.visible = masteredRef.current.has(h.hanzi)
-        })
-        ysortLay.addChild(orb)
-      }
-
-      // ── Dragon — serpentine silhouette, viewport-fixed ─────────
-      const dragonG = new PIXI.Graphics()
-      skyLay.addChild(dragonG)
-
-      // ── Player ─────────────────────────────────────────────────
-      const playerShadow = new PIXI.Graphics()
-      playerShadow.ellipse(0, 0, 20, 7).fill({ color: 0x000000, alpha: 0.18 })
-
-      const playerFrames = {
-        down:  mkAtlasFrames(charsTex, 0, 0),  // row 0 = front
-        left:  mkAtlasFrames(charsTex, 0, 1),  // row 1 = left
-        up:    mkAtlasFrames(charsTex, 0, 2),  // row 2 = back
-        right: mkAtlasFrames(charsTex, 0, 3),  // row 3 = right
-      }
-      const playerSpr = new PIXI.AnimatedSprite(playerFrames.down)
-      playerSpr.anchor.set(0.5, 1.0); playerSpr.scale.set(0.625); playerSpr.play()
-
-      const player = new PIXI.Container()
-      player.addChild(playerSpr)
-      player.x = 210; player.y = GY
-      playerShadow.x = 210; playerShadow.y = GY + 5
-      ysortLay.addChild(playerShadow, player)
-      let playerDir: keyof typeof playerFrames = 'down'
-
-      // ── Falling leaves ─────────────────────────────────────────
-      interface Leaf { g: PIXI.Graphics; x: number; y: number; vx: number; vy: number; rot: number; color: number }
-      const leafColors = [K.cherry, K.cherryB, K.leaf, K.leafL, K.grassL]
-      const leaves: Leaf[] = []
-      for (let i = 0; i < 40; i++) {
-        const lg = new PIXI.Graphics()
-        const lc = leafColors[i % leafColors.length]
-        lg.ellipse(0, 0, 6, 3).fill({ color: lc, alpha: 0.7 })
-        const lx = Math.random() * WW, ly = 580 + Math.random() * 200
-        lg.x = lx; lg.y = ly
-        partLay.addChild(lg)
-        leaves.push({ g: lg, x: lx, y: ly, vx: (Math.random() - 0.5) * 0.8, vy: 0.4 + Math.random() * 0.6, rot: Math.random() * Math.PI * 2, color: lc })
-      }
-
-      // ── Smoke emitters ─────────────────────────────────────────
-      interface Smoke { g: PIXI.Graphics; ox: number; oy: number; life: number; max: number; phase: number }
-      const smokeEmitters = [
-        { ox: 185,  oy: GY - 240 }, { ox: 1155, oy: GY - 200 }, { ox: 1440, oy: GY - 60 },
-        { ox: 2375, oy: GY - 260 }, { ox: 2495, oy: GY - 55  },
-      ]
-      const smokes: Smoke[] = []
-      smokeEmitters.forEach((em) => {
-        for (let i = 0; i < 5; i++) {
-          const sg = new PIXI.Graphics()
-          const life = Math.random() * 80
-          sg.circle(0, 0, 8 + Math.random() * 6).fill({ color: 0xDDDDE0, alpha: 0.18 })
-          sg.x = em.ox + (Math.random() - 0.5) * 8
-          sg.y = em.oy - life * 1.2
-          sg.alpha = Math.max(0, 0.3 - life / 80 * 0.3)
-          sg.scale.set(0.5 + life / 80 * 0.8)
-          partLay.addChild(sg)
-          smokes.push({ g: sg, ox: em.ox, oy: em.oy, life, max: 80 + Math.random() * 40, phase: Math.random() * Math.PI * 2 })
-        }
-      })
-
-      // ── Birds ──────────────────────────────────────────────────
-      interface Bird { g: PIXI.Graphics; x: number; y: number; vx: number; vy: number; flap: number }
-      const birds: Bird[] = []
-      for (let i = 0; i < 6; i++) {
-        const bg2 = new PIXI.Graphics()
-        bg2.poly([-8, 0, 0, -4, 8, 0]).fill({ color: 0x333344, alpha: 0.6 })
-        bg2.x = Math.random() * WW; bg2.y = 200 + Math.random() * 150
-        partLay.addChild(bg2)
-        birds.push({ g: bg2, x: bg2.x, y: bg2.y, vx: 1 + Math.random() * 1.5, vy: (Math.random() - 0.5) * 0.3, flap: Math.random() * Math.PI * 2 })
-      }
-
-      // ── Water shimmer ──────────────────────────────────────────
-      const waterGfx: PIXI.Graphics[] = []
-      const waterAreas = [
-        { x: 724,  y: 604,      w: 58,  h: 296 },
-        { x: 1508, y: GY - 2,   w: 104, h: 64  },
-        { x: 1916, y: GY - 117, w: 50,  h: 30  },
-      ]
-      waterAreas.forEach(() => {
-        const wg2 = new PIXI.Graphics(); partLay.addChild(wg2); waterGfx.push(wg2)
-      })
-
-      // ── Camera state ────────────────────────────────────────────
-      let camX = 0, camY = 0
-      let dragonWX = 700
-      const targetCam = { x: 0, y: 0 }
-
-      // ── Main ticker ────────────────────────────────────────────
-      let t = 0
-      app.ticker.add((tk) => {
-        t += tk.deltaTime
-        const spd = 2.8 * tk.deltaTime
-
-        // ── Input resolution: joystick takes priority over keyboard ──────────
-        let mx: number, my: number, speedMult: number
-
-        if (moveInput.magnitude > DEAD_ZONE) {
-          // Analog joystick — variable speed; past RUN_THRESHOLD = running
-          mx        = moveInput.dx
-          my        = moveInput.dy
-          speedMult = moveInput.magnitude >= RUN_THRESHOLD
-            ? RUN_SPEED_MULT
-            : moveInput.magnitude  // walk proportional to push distance
-        } else {
-          // Digital keyboard — always full speed
-          const kx = (keys['ArrowLeft'] || keys['a'] || keys['A']) ? -1 : (keys['ArrowRight'] || keys['d'] || keys['D']) ? 1 : 0
-          const ky = (keys['ArrowUp']   || keys['w'] || keys['W']) ? -1 : (keys['ArrowDown']  || keys['s'] || keys['S']) ? 1 : 0
-          mx = kx; my = ky
-          speedMult = (kx !== 0 || ky !== 0) ? 1.0 : 0
-        }
-
-        // Player movement
-        const moving = speedMult > 0
-        if (moving) {
-          player.x += mx * spd * speedMult
-          player.y += my * spd * speedMult
-          const newDir: keyof typeof playerFrames =
-            (Math.abs(my) >= Math.abs(mx)) ? (my > 0 ? 'down' : 'up') : (mx > 0 ? 'right' : 'left')
-          if (newDir !== playerDir) {
-            playerDir = newDir
-            playerSpr.textures = playerFrames[playerDir]
-            playerSpr.gotoAndPlay(0)
-          }
-          if (!playerSpr.playing) playerSpr.play()
-        } else {
-          playerSpr.stop()
-          playerSpr.currentFrame = 0
-        }
-        player.x = Math.max(16, Math.min(WW - 16, player.x))
-        player.y = Math.max(520, Math.min(WH - 16, player.y))
-        playerShadow.x = player.x + 4
-        playerShadow.y = player.y + 5
-
-        // Camera smooth follow
-        targetCam.x = player.x - W / 2
-        targetCam.y = player.y - H / 2 - 60
-        camX += (targetCam.x - camX) * 0.1
-        camY += (targetCam.y - camY) * 0.1
-        camX = Math.max(0, Math.min(WW - W, camX))
-        camY = Math.max(0, Math.min(WH - H, camY))
-
-        // World scroll + parallax + Y-sort (all in one pipeline call)
-        pipeline.update(camX, camY)
-        landmark.update(camX)
-
-        // NPC float
-        npc.y = GY + Math.sin(t * 0.02) * 3
-
-        // Walking NPCs
-        walkers.forEach((w) => {
-          w.t += tk.deltaTime
-          w.cont.x += w.dir * w.spd * tk.deltaTime
-          const newDir = w.cont.x > w.max ? -1 : w.cont.x < w.min ? 1 : w.dir
-          if (newDir !== w.dir) {
-            w.dir = newDir
-            w.spr.textures = w.dir > 0 ? w.rightFrames : w.leftFrames
-            w.spr.gotoAndPlay(0)
-          }
-          w.cont.y = GY + Math.abs(Math.sin(w.t * 0.15)) * 3
-        })
-
-        // Falling leaves
-        leaves.forEach((lf) => {
-          lf.x += lf.vx + Math.sin(t * 0.02 + lf.rot) * 0.4
-          lf.y += lf.vy
-          lf.rot += 0.04
-          lf.g.x = lf.x; lf.g.y = lf.y; lf.g.rotation = lf.rot
-          if (lf.y > WH) { lf.y = 560 + Math.random() * 100; lf.x = Math.random() * WW }
-        })
-
-        // Smoke
-        smokes.forEach((s) => {
-          s.life += tk.deltaTime * 0.5
-          if (s.life > s.max) { s.life = 0; s.g.x = s.ox + (Math.random() - 0.5) * 10; s.g.y = s.oy }
-          s.g.x += Math.sin(t * 0.03 + s.phase) * 0.2
-          s.g.y = s.oy - s.life * 1.4
-          s.g.alpha = Math.max(0, 0.28 - (s.life / s.max) * 0.28)
-          s.g.scale.set(0.4 + (s.life / s.max) * 0.9)
-        })
-
-        // Dragon ambient flight — loops across full world width
-        dragonWX += 0.55 * tk.deltaTime
-        if (dragonWX > WW + 160) dragonWX = -160
-        const dBaseY = Math.round(H * 0.42)
-        dragonG.clear()
-        for (let s = 9; s >= 0; s--) {
-          const sx = dragonWX - s * 14
-          const sy = dBaseY + Math.sin(t * 0.016 + s * 0.42) * 14
-          const r  = Math.max(1.5, 5.5 - s * 0.45)
-          dragonG.ellipse(sx, sy, r * 2.2, r).fill({ color: 0x1A2848, alpha: Math.max(0.08, 0.65 - s * 0.06) })
-        }
-        // Head horns
-        const hx = dragonWX, hy = dBaseY + Math.sin(t * 0.016) * 14
-        dragonG.poly([hx + 6, hy - 4, hx + 11, hy - 11, hx + 9, hy - 2]).fill({ color: 0x2A3A58, alpha: 0.6 })
-        dragonG.poly([hx + 2, hy - 5, hx + 5,  hy - 12, hx + 4, hy - 2]).fill({ color: 0x2A3A58, alpha: 0.6 })
-
-        // Birds
-        birds.forEach((b) => {
-          b.flap += 0.18
-          b.x += b.vx
-          b.y += Math.sin(b.flap * 2) * 0.5 + b.vy
-          if (b.x > WW + 50) { b.x = -50; b.y = 180 + Math.random() * 160 }
-          b.g.x = b.x; b.g.y = b.y; b.g.clear()
-          const wingDip = Math.sin(b.flap) * 5
-          b.g.poly([-8, wingDip, 0, 0, 8, wingDip]).fill({ color: 0x2A2A3A, alpha: 0.55 })
-        })
-
-        // Water shimmer
-        waterAreas.forEach((wa, idx) => {
-          const wg2 = waterGfx[idx]; wg2.clear()
-          for (let i = 0; i < 4; i++) {
-            const wy2 = wa.y + wa.h * (0.2 + i * 0.2) + Math.sin(t * 0.06 + i * 0.8) * 3
-            wg2.rect(wa.x + wa.w * 0.06, wy2, wa.w * 0.88, 2).fill({ color: K.wL, alpha: 0.25 + Math.sin(t * 0.08 + i) * 0.12 })
-          }
-        })
-      })
-
-      const onKeyDown = (e: KeyboardEvent) => {
-        keys[e.key] = true
-        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault()
-      }
-      const onKeyUp = (e: KeyboardEvent) => { keys[e.key] = false }
-      window.addEventListener('keydown', onKeyDown)
-      window.addEventListener('keyup', onKeyUp)
-    }
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault()
-    }
-    window.addEventListener('keydown', onKeyDown)
-
-    init()
-
-    return () => {
-      destroyed = true
-      window.removeEventListener('keydown', onKeyDown)
-      try { app?.destroy(true) } catch (_) { /* ignore */ }
-    }
-  }, [])
-
+// ─── Ink-brush SVG strokes for each character ────────────────────────────────
+// Each character is rendered as decorative SVG paths in background
+function InkBrushBg({ char }: { char: string }) {
   return (
-    <div
-      className="relative w-full h-full flex items-center justify-center bg-[#1A2030] overflow-hidden"
-      style={{ touchAction: 'none' }}
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
+      <span
+        style={{
+          fontSize: '28vmin',
+          color: 'rgba(255,200,50,0.04)',
+          fontFamily: 'serif',
+          lineHeight: 1,
+          userSelect: 'none',
+          fontWeight: 900,
+          letterSpacing: 0,
+        }}
+      >
+        {char}
+      </span>
+    </div>
+  )
+}
+
+// ─── Master Chin SVG silhouette ───────────────────────────────────────────────
+function MasterChin({ action, size = 200 }: { action: MasterAction; size?: number }) {
+  const isNodding    = action === 'nod' || action === 'bow'
+  const isSweeping   = action === 'sweep-arm'
+  const isPointing   = action === 'point-self' || action === 'point-up'
+  const isGesturing  = action === 'gesture-come'
+  const isMeditating = action === 'meditate'
+  const isShaking    = action === 'shake-head'
+
+  // Body color — deep ink silhouette
+  const fill = '#1a2035'
+  const accent = '#c8860a'
+
+  const w = Math.round(size * 120 / 220)
+  return (
+    <svg
+      viewBox="0 0 120 220"
+      width={w}
+      height={size}
+      style={{ overflow: 'visible' }}
     >
-      <div ref={containerRef} />
+      {/* Robe / body */}
+      <ellipse cx="60" cy="165" rx="32" ry="52" fill={fill} />
+      {/* Head */}
+      <circle
+        cx="60"
+        cy="62"
+        r="22"
+        fill={fill}
+        style={
+          isShaking
+            ? { animation: 'chinShake 0.5s ease-in-out infinite alternate' }
+            : isNodding
+            ? { animation: 'chinNod 1.2s ease-in-out infinite alternate', transformOrigin: '60px 84px' }
+            : undefined
+        }
+      />
+      {/* Hair bun */}
+      <ellipse
+        cx="60"
+        cy="42"
+        rx="8"
+        ry="6"
+        fill={fill}
+        style={isShaking ? { animation: 'chinShake 0.5s ease-in-out infinite alternate' } : undefined}
+      />
+      <rect cx="60" cy="38" width="4" height="10" x="58" fill={accent} rx="2" />
 
-      {/* Mobile virtual joystick + action buttons */}
-      <MobileControls />
+      {/* Left arm */}
+      <path
+        d={isMeditating ? 'M44 135 Q32 148 38 162' : isGesturing ? 'M44 135 Q24 120 16 108' : 'M44 135 Q28 148 30 168'}
+        stroke={fill}
+        strokeWidth="14"
+        strokeLinecap="round"
+        fill="none"
+        style={isGesturing ? { animation: 'chinGesture 1.4s ease-in-out infinite alternate' } : undefined}
+      />
+      {/* Right arm */}
+      <path
+        d={
+          isPointing && action === 'point-self'
+            ? 'M76 135 Q92 125 98 112'
+            : isPointing && action === 'point-up'
+            ? 'M76 135 Q90 110 86 80'
+            : isMeditating
+            ? 'M76 135 Q88 148 82 162'
+            : isSweeping
+            ? 'M76 135 Q100 110 108 92'
+            : 'M76 135 Q92 148 90 168'
+        }
+        stroke={fill}
+        strokeWidth="14"
+        strokeLinecap="round"
+        fill="none"
+        style={isSweeping ? { animation: 'chinSweep 1.8s ease-in-out infinite alternate' } : undefined}
+      />
 
-      {npcText && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-30 w-full max-w-lg px-4">
-          <div
-            className="bg-matsuri-ink/92 border border-matsuri-gold/40 rounded-lg p-4 cursor-pointer shadow-2xl"
-            onClick={() => setNpcText(null)}
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full bg-matsuri-gold" />
-              <span className="text-matsuri-gold font-display text-xs tracking-widest uppercase">Sifu Liang</span>
-            </div>
-            <p className="text-matsuri-paper text-sm leading-relaxed font-body">{npcText}</p>
-            <p className="text-matsuri-paper/25 text-[10px] mt-2 text-right">Clique para continuar</p>
-          </div>
-        </div>
+      {/* Sash belt */}
+      <rect x="40" y="148" width="40" height="7" fill={accent} rx="3" opacity={0.9} />
+
+      {/* Pointing hand indicator */}
+      {(action === 'point-self' || action === 'point-up') && (
+        <circle
+          cx={action === 'point-self' ? 100 : 84}
+          cy={action === 'point-self' ? 110 : 77}
+          r="5"
+          fill={accent}
+          opacity={0.9}
+          style={{ animation: 'chinPulse 1s ease-in-out infinite alternate' }}
+        />
       )}
 
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-30 pointer-events-none">
-        <div className="bg-matsuri-ink/55 backdrop-blur-sm rounded-full px-5 py-1.5">
-          <p className="text-[9px] text-matsuri-paper/40 tracking-widest uppercase">
-            WASD / ↑↓←→ explorar · Clique nos orbes de Hanzi · 👤🎒🌳 painéis
+      {/* Meditate glow */}
+      {isMeditating && (
+        <circle cx="60" cy="62" r="28" fill="none" stroke={accent} strokeWidth="2" opacity={0.35}
+          style={{ animation: 'chinGlow 2s ease-in-out infinite alternate' }} />
+      )}
+
+      <style>{`
+        @keyframes chinShake {
+          from { transform: translateX(-4px); }
+          to   { transform: translateX(4px); }
+        }
+        @keyframes chinNod {
+          from { transform: rotate(-6deg); }
+          to   { transform: rotate(6deg); }
+        }
+        @keyframes chinGesture {
+          from { d: path('M44 135 Q24 120 16 108'); }
+          to   { d: path('M44 135 Q28 110 20 96'); }
+        }
+        @keyframes chinSweep {
+          from { d: path('M76 135 Q100 110 108 92'); }
+          to   { d: path('M76 135 Q104 118 114 102'); }
+        }
+        @keyframes chinPulse {
+          from { opacity: 0.5; r: 4; }
+          to   { opacity: 1;   r: 6; }
+        }
+        @keyframes chinGlow {
+          from { opacity: 0.2; }
+          to   { opacity: 0.5; }
+        }
+      `}</style>
+    </svg>
+  )
+}
+
+// ─── Tone badge ───────────────────────────────────────────────────────────────
+const TONE_STYLE: Record<number, { border: string; glow: string; label: string }> = {
+  1: { border: '#3B82F6', glow: '0 0 32px #3B82F688', label: '1° — nivelado ¯' },
+  2: { border: '#00A86B', glow: '0 0 32px #00A86B88', label: '2° — ascendente /' },
+  3: { border: '#9B59B6', glow: '0 0 32px #9B59B688', label: '3° — ondulante ˇ' },
+  4: { border: '#AA0000', glow: '0 0 32px #AA000088', label: '4° — descendente \\' },
+  5: { border: '#666',    glow: '0 0 24px #66666644', label: 'neutro' },
+}
+
+// ─── Phase: Story ─────────────────────────────────────────────────────────────
+function StoryPhase({ lesson, onContinue }: { lesson: Lesson; onContinue: () => void }) {
+  const [visible, setVisible] = useState(false)
+  useEffect(() => { const t = setTimeout(() => setVisible(true), 120); return () => clearTimeout(t) }, [])
+
+  const ts = TONE_STYLE[lesson.hanzi.tone]
+
+  return (
+    <div className="flex flex-col items-center px-8 py-6 gap-5" style={{ minHeight: '100%', paddingBottom: 56 }}>
+      {/* Master + dialogue */}
+      <div
+        className="flex items-center gap-6 w-full max-w-xl flex-shrink-0"
+        style={{ opacity: visible ? 1 : 0, transition: 'opacity 0.6s ease' }}
+      >
+        <div className="flex-shrink-0">
+          <MasterChin action={lesson.masterAction} size={155} />
+        </div>
+        <div
+          className="relative rounded-2xl px-5 py-4 flex-1"
+          style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+        >
+          <div
+            className="absolute left-0 top-1/2 -translate-x-3 -translate-y-1/2 w-0 h-0"
+            style={{ borderTop: '10px solid transparent', borderBottom: '10px solid transparent', borderRight: '12px solid rgba(255,255,255,0.05)' }}
+          />
+          <p className="text-white/80 text-sm leading-relaxed font-light tracking-wide">
+            {lesson.storyContext}
           </p>
         </div>
       </div>
+
+      {/* Character reveal */}
+      <div
+        className="flex flex-col items-center gap-3 flex-shrink-0"
+        style={{ opacity: visible ? 1 : 0, transition: 'opacity 0.8s ease 0.3s' }}
+      >
+        <div
+          className="flex items-center justify-center rounded-2xl"
+          style={{
+            width: 140, height: 140,
+            background: 'rgba(0,0,0,0.4)',
+            border: `2px solid ${ts.border}`,
+            boxShadow: ts.glow,
+          }}
+        >
+          <span style={{ fontSize: 84, lineHeight: 1, fontFamily: 'serif', color: '#fff', textShadow: ts.glow }}>
+            {lesson.hanzi.hanzi}
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-amber-300 text-xl font-light tracking-widest">{lesson.hanzi.pinyin}</span>
+          <span
+            className="text-xs px-2 py-0.5 rounded-full"
+            style={{ background: ts.border + '33', color: ts.border, border: `1px solid ${ts.border}55` }}
+          >
+            {ts.label}
+          </span>
+        </div>
+      </div>
+
+      {/* Continue */}
+      <button
+        onClick={onContinue}
+        className="px-10 py-3 rounded-xl text-sm font-medium tracking-widest uppercase transition-all duration-200 flex-shrink-0"
+        style={{
+          background: 'rgba(200,134,10,0.15)',
+          border: '1px solid rgba(200,134,10,0.5)',
+          color: '#e8b84b',
+          opacity: visible ? 1 : 0,
+          transition: 'opacity 0.6s ease 0.6s, background 0.2s',
+        }}
+        onMouseEnter={e => { (e.target as HTMLButtonElement).style.background = 'rgba(200,134,10,0.3)' }}
+        onMouseLeave={e => { (e.target as HTMLButtonElement).style.background = 'rgba(200,134,10,0.15)' }}
+      >
+        Estou pronto(a) →
+      </button>
+    </div>
+  )
+}
+
+// ─── Phase: Challenge ─────────────────────────────────────────────────────────
+function ChallengePhase({
+  lesson,
+  onAnswer,
+}: {
+  lesson: Lesson
+  onAnswer: (correct: boolean, chosenIdx: number) => void
+}) {
+  const [chosen, setChosen] = useState<number | null>(null)
+  const ts = TONE_STYLE[lesson.hanzi.tone]
+
+  const pick = (i: number) => {
+    if (chosen !== null) return
+    setChosen(i)
+    const correct = i === lesson.correctIndex
+    setTimeout(() => onAnswer(correct, i), 900)
+  }
+
+  return (
+    <div className="flex flex-col items-center px-8 py-6 gap-6" style={{ minHeight: '100%', paddingBottom: 56 }}>
+      {/* Prompt */}
+      <div className="text-center space-y-1">
+        <p className="text-white/40 text-xs uppercase tracking-widest">Mestre Chin pergunta</p>
+        <p className="text-white/85 text-base leading-snug max-w-md">{lesson.challengePrompt}</p>
+      </div>
+
+      {/* Character */}
+      <div className="flex flex-col items-center gap-2">
+        <div
+          className="flex items-center justify-center rounded-2xl"
+          style={{
+            width: 140, height: 140,
+            background: 'rgba(0,0,0,0.45)',
+            border: `2px solid ${chosen === null ? ts.border : chosen === lesson.correctIndex ? '#00A86B' : '#AA0000'}`,
+            boxShadow: chosen === null ? ts.glow : chosen === lesson.correctIndex ? '0 0 32px #00A86B88' : '0 0 32px #AA000088',
+            transition: 'border-color 0.4s, box-shadow 0.4s',
+          }}
+        >
+          <span style={{ fontSize: 84, lineHeight: 1, fontFamily: 'serif', color: '#fff' }}>
+            {lesson.hanzi.hanzi}
+          </span>
+        </div>
+        <span className="text-amber-300 text-xl tracking-widest">{lesson.hanzi.pinyin}</span>
+      </div>
+
+      {/* Options */}
+      <div className="grid grid-cols-2 gap-3 w-full max-w-sm">
+        {lesson.options.map((opt, i) => {
+          const isCorrect = i === lesson.correctIndex
+          const isChosen  = chosen === i
+          let bg = 'rgba(255,255,255,0.05)'
+          let border = 'rgba(255,255,255,0.1)'
+          let color = 'rgba(255,255,255,0.8)'
+          if (chosen !== null) {
+            if (isCorrect) { bg = 'rgba(0,168,107,0.2)'; border = '#00A86B'; color = '#00A86B' }
+            else if (isChosen) { bg = 'rgba(170,0,0,0.2)'; border = '#AA0000'; color = '#AA0000' }
+          }
+          return (
+            <button
+              key={i}
+              onClick={() => pick(i)}
+              disabled={chosen !== null}
+              className="py-4 px-5 rounded-xl text-sm font-medium transition-all duration-300 disabled:cursor-default"
+              style={{ background: bg, border: `1px solid ${border}`, color }}
+            >
+              {opt}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ─── Phase: Result ────────────────────────────────────────────────────────────
+function ResultPhase({
+  lesson,
+  correct,
+  onNext,
+}: {
+  lesson: Lesson
+  correct: boolean
+  onNext: () => void
+}) {
+  const [reveal, setReveal] = useState(false)
+  useEffect(() => { const t = setTimeout(() => setReveal(true), 300); return () => clearTimeout(t) }, [])
+  const ts = TONE_STYLE[lesson.hanzi.tone]
+
+  return (
+    <div className="flex flex-col items-center px-8 py-5 gap-4" style={{ paddingBottom: 56 }}>
+      {/* Verdict banner */}
+      <div
+        className="w-full max-w-md rounded-xl px-6 py-2.5 text-center text-sm font-medium tracking-widest uppercase flex-shrink-0"
+        style={correct
+          ? { background: 'rgba(0,168,107,0.15)', border: '1px solid #00A86B66', color: '#00A86B' }
+          : { background: 'rgba(170,0,0,0.15)', border: '1px solid #AA000066', color: '#dd4444' }}
+      >
+        {correct ? '✓ Correto — seu espírito avança' : '✗ A mente precisa de mais treino'}
+      </div>
+
+      {/* Compact character + meaning row */}
+      <div className="flex items-center gap-5 flex-shrink-0">
+        <div
+          className="flex items-center justify-center rounded-xl"
+          style={{ width: 78, height: 78, background: 'rgba(0,0,0,0.4)', border: `2px solid ${ts.border}`, boxShadow: ts.glow, flexShrink: 0 }}
+        >
+          <span style={{ fontSize: 46, lineHeight: 1, fontFamily: 'serif', color: '#fff' }}>
+            {lesson.hanzi.hanzi}
+          </span>
+        </div>
+        <div>
+          <p className="text-amber-300 text-xl tracking-widest">{lesson.hanzi.pinyin}</p>
+          <p className="text-white font-medium text-base">{lesson.hanzi.meaning_pt}</p>
+          <p className="text-white/35 text-xs mt-0.5 italic">{lesson.hanzi.hsk_level > 0 ? `HSK ${lesson.hanzi.hsk_level}` : ''}</p>
+        </div>
+      </div>
+
+      {/* Decomposition */}
+      <div
+        className="w-full max-w-md flex-shrink-0"
+        style={{ opacity: reveal ? 1 : 0, transition: 'opacity 0.7s ease' }}
+      >
+        <p className="text-white/25 text-xs uppercase tracking-widest mb-2">Decomposição radical</p>
+        <div className="flex gap-2 flex-wrap mb-2">
+          {lesson.decomposition.map((part, i) => (
+            <div
+              key={i}
+              className="flex items-center gap-2 rounded-lg px-3 py-2"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              <span style={{ fontSize: 24, fontFamily: 'serif', color: '#e8b84b' }}>{part.char}</span>
+              <div className="text-xs">
+                <p className="text-white/75">{part.meaning}</p>
+                {part.note && <p className="text-white/30 mt-0.5">{part.note}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+        <p className="text-white/40 text-xs leading-relaxed italic">{lesson.hanzi.etymology}</p>
+      </div>
+
+      {/* Master's insight */}
+      <div
+        className="w-full max-w-md rounded-xl px-5 py-3 flex-shrink-0"
+        style={{
+          background: 'rgba(200,134,10,0.07)',
+          border: '1px solid rgba(200,134,10,0.2)',
+          opacity: reveal ? 1 : 0,
+          transition: 'opacity 0.7s ease 0.4s',
+        }}
+      >
+        <p className="text-xs text-amber-500/50 uppercase tracking-widest mb-1.5">Mestre Chin diz</p>
+        <p className="text-amber-100/70 text-sm leading-relaxed">{lesson.masterInsight}</p>
+      </div>
+
+      <button
+        onClick={onNext}
+        className="px-10 py-3 rounded-xl text-sm font-medium tracking-widest uppercase flex-shrink-0 mb-2"
+        style={{
+          background: 'rgba(200,134,10,0.15)',
+          border: '1px solid rgba(200,134,10,0.5)',
+          color: '#e8b84b',
+          opacity: reveal ? 1 : 0,
+          transition: 'opacity 0.6s ease 0.8s',
+        }}
+      >
+        Próxima lição →
+      </button>
+    </div>
+  )
+}
+
+// ─── Lesson runner ────────────────────────────────────────────────────────────
+type LessonPhase = 'story' | 'challenge' | 'result'
+
+function LessonRunner({ lesson, onComplete }: { lesson: Lesson; onComplete: () => void }) {
+  const [phase, setPhase] = useState<LessonPhase>('story')
+  const [wasCorrect, setWasCorrect] = useState(false)
+  const submitAnswer = useGameStore((s) => s.submitAnswer)
+
+  const handleAnswer = (correct: boolean) => {
+    setWasCorrect(correct)
+    submitAnswer(lesson.hanzi, correct)
+    setPhase('result')
+  }
+
+  return (
+    <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+      <InkBrushBg char={lesson.hanzi.hanzi} />
+      <div style={{ position: 'absolute', inset: 0, overflowY: 'auto', scrollbarWidth: 'none' }}>
+        {phase === 'story'     && <StoryPhase     lesson={lesson} onContinue={() => setPhase('challenge')} />}
+        {phase === 'challenge' && <ChallengePhase lesson={lesson} onAnswer={(c) => handleAnswer(c)} />}
+        {phase === 'result'    && <ResultPhase    lesson={lesson} correct={wasCorrect} onNext={onComplete} />}
+      </div>
+    </div>
+  )
+}
+
+// ─── Dojo home — lesson map ───────────────────────────────────────────────────
+function DojoHome({
+  currentIdx,
+  masteredHanzi,
+  onSelectLesson,
+}: {
+  currentIdx: number
+  masteredHanzi: Set<string>
+  onSelectLesson: (idx: number) => void
+}) {
+  const acts = [1, 2, 3, 4]
+  return (
+    <div className="flex flex-col h-full px-6 py-8 gap-6 overflow-y-auto">
+      {/* Header */}
+      <div className="text-center space-y-1">
+        <p className="text-amber-400/60 text-xs uppercase tracking-[0.3em]">Dojo da Mestre Chin</p>
+        <h1 className="text-white text-2xl font-light tracking-widest">武學漢字</h1>
+        <p className="text-white/30 text-xs">A arte marcial da linguagem</p>
+      </div>
+
+      {/* Lesson tiles grouped by act */}
+      <div className="space-y-6 flex-1">
+        {acts.map((act) => {
+          const actLessons = CURRICULUM.filter((l) => l.act === act)
+          if (!actLessons.length) return null
+          return (
+            <div key={act}>
+              <p className="text-white/20 text-xs uppercase tracking-widest mb-3">Ato {act}</p>
+              <div className="grid grid-cols-5 gap-2">
+                {actLessons.map((lesson) => {
+                  const globalIdx = CURRICULUM.findIndex((l) => l.id === lesson.id)
+                  const mastered  = masteredHanzi.has(lesson.hanzi.hanzi)
+                  const active    = globalIdx === currentIdx
+                  const locked    = globalIdx > currentIdx && !mastered
+                  const ts        = TONE_STYLE[lesson.hanzi.tone]
+                  return (
+                    <button
+                      key={lesson.id}
+                      onClick={() => !locked && onSelectLesson(globalIdx)}
+                      disabled={locked}
+                      title={locked ? 'Complete a lição anterior primeiro' : lesson.hanzi.meaning_pt}
+                      className="relative flex flex-col items-center justify-center rounded-xl py-3 transition-all duration-200"
+                      style={{
+                        background: mastered
+                          ? 'rgba(0,168,107,0.15)'
+                          : active
+                          ? `${ts.border}22`
+                          : 'rgba(255,255,255,0.04)',
+                        border: mastered
+                          ? '1px solid #00A86B55'
+                          : active
+                          ? `2px solid ${ts.border}`
+                          : locked
+                          ? '1px solid rgba(255,255,255,0.04)'
+                          : '1px solid rgba(255,255,255,0.1)',
+                        opacity: locked ? 0.3 : 1,
+                        cursor: locked ? 'not-allowed' : 'pointer',
+                        boxShadow: active ? ts.glow : 'none',
+                      }}
+                    >
+                      <span style={{ fontSize: 28, fontFamily: 'serif', color: mastered ? '#00A86B' : locked ? '#555' : '#fff' }}>
+                        {lesson.hanzi.hanzi}
+                      </span>
+                      <span className="text-xs mt-1" style={{ color: mastered ? '#00A86B88' : 'rgba(255,255,255,0.3)' }}>
+                        {lesson.hanzi.pinyin}
+                      </span>
+                      {mastered && (
+                        <span className="absolute top-1 right-1 text-xs text-green-500 opacity-70">✓</span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Master Chin ambient */}
+      <div className="flex items-center gap-4 px-4 py-3 rounded-xl" style={{ background: 'rgba(200,134,10,0.06)', border: '1px solid rgba(200,134,10,0.15)' }}>
+        <MasterChin action="standing" size={80} />
+        <div>
+          <p className="text-amber-300/80 text-xs font-medium mb-1">Mestre Chin</p>
+          <p className="text-white/40 text-xs leading-relaxed">
+            {masteredHanzi.size === 0
+              ? '"O maior palácio começa com um único tijolo. Comece pela primeira lição."'
+              : masteredHanzi.size < 5
+              ? `"Você já domina ${masteredHanzi.size} caractere${masteredHanzi.size > 1 ? 's' : ''}. O caminho continua."`
+              : '"Seu espírito já brilha. Continue — o mandarim é um oceano sem fim."'}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── GameScene ────────────────────────────────────────────────────────────────
+export function GameScene() {
+  const masteredHanzi = useGameStore((s) => s.masteredHanzi)
+  const learningRecords = useGameStore((s) => s.learningRecords)
+
+  // Find the first lesson not yet mastered
+  const firstPendingIdx = CURRICULUM.findIndex(
+    (l) => !masteredHanzi.has(l.hanzi.hanzi)
+  )
+  const currentIdx = firstPendingIdx === -1 ? CURRICULUM.length - 1 : firstPendingIdx
+
+  const [view, setView] = useState<'home' | 'lesson'>('home')
+  const [lessonIdx, setLessonIdx] = useState(currentIdx)
+
+  // Sync when mastery changes
+  const prevMastered = useRef(masteredHanzi.size)
+  useEffect(() => {
+    if (masteredHanzi.size !== prevMastered.current) {
+      prevMastered.current = masteredHanzi.size
+    }
+  }, [masteredHanzi])
+
+  const startLesson = (idx: number) => {
+    setLessonIdx(idx)
+    setView('lesson')
+  }
+
+  const completeLesson = () => {
+    setView('home')
+  }
+
+  const lesson = CURRICULUM[lessonIdx]
+
+  return (
+    <div
+      className="relative w-full h-full flex flex-col"
+      style={{
+        background: 'linear-gradient(160deg, #06080F 0%, #0d1220 55%, #0a0e18 100%)',
+        color: '#fff',
+        overflow: 'hidden',
+      }}
+    >
+      {/* Ambient grid lines */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage:
+            'linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px)',
+          backgroundSize: '40px 40px',
+        }}
+      />
+
+      {/* Ambient glow top-left */}
+      <div
+        className="absolute pointer-events-none"
+        style={{
+          top: -80, left: -80, width: 340, height: 340,
+          background: 'radial-gradient(circle, rgba(200,134,10,0.08) 0%, transparent 70%)',
+        }}
+      />
+
+      {/* Top bar */}
+      <div
+        className="relative z-10 flex items-center justify-between px-5 py-3 flex-shrink-0"
+        style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+      >
+        <div className="flex items-center gap-2">
+          <span style={{ fontSize: 22, fontFamily: 'serif', color: '#c8860a' }}>武</span>
+          <span className="text-white/50 text-xs tracking-widest uppercase">Mestre Chin</span>
+        </div>
+        {view === 'lesson' && (
+          <button
+            onClick={() => setView('home')}
+            className="text-white/30 text-xs hover:text-white/60 transition-colors"
+          >
+            ← Voltar ao Dojo
+          </button>
+        )}
+        {view === 'home' && learningRecords.size > 0 && (
+          <button
+            onClick={() => startLesson(currentIdx)}
+            className="text-xs px-4 py-1.5 rounded-lg transition-colors"
+            style={{
+              background: 'rgba(200,134,10,0.15)',
+              border: '1px solid rgba(200,134,10,0.35)',
+              color: '#e8b84b',
+            }}
+          >
+            Continuar →
+          </button>
+        )}
+      </div>
+
+      {/* Main content */}
+      <div className="relative z-10 flex-1 min-h-0">
+        {view === 'home' && (
+          <DojoHome
+            currentIdx={currentIdx}
+            masteredHanzi={masteredHanzi}
+            onSelectLesson={startLesson}
+          />
+        )}
+        {view === 'lesson' && lesson && (
+          <LessonRunner lesson={lesson} onComplete={completeLesson} />
+        )}
+        {view === 'lesson' && !lesson && (
+          <div className="flex items-center justify-center h-full text-white/30">
+            Todas as lições dominadas. Mestre Chin sorri.
+          </div>
+        )}
+      </div>
+
     </div>
   )
 }
