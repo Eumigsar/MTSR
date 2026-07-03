@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js'
 import { GY, K } from '../constants'
-import { NA } from '../../engine/AtlasRegistry'
-import { drawBridge, drawSign } from '../drawHelpers'
+import { BA, NA } from '../../engine/AtlasRegistry'
+import { drawBridge, drawSign, makeStoneLantern } from '../drawHelpers'
 import type { RenderCtx, ZoneLayers } from '../../engine/types'
 
 // ─── Zone 2 — Bamboo Forest (x: 540–1080) ────────────────────────────────────
@@ -34,6 +34,11 @@ export function buildZone2Bamboo(layers: ZoneLayers, ctx: RenderCtx): void {
   drawSign(infra, 580, GY, '竹林徑')
   drawSign(infra, 760, GY, '清溪橋')
 
+  // Stone railing on bridge approach (scaled to match 88px bridge)
+  const rail = ctx.bsp(...BA.RAILING_LG)
+  rail.anchor.set(0.5, 1); rail.x = 754; rail.y = GY; rail.scale.set(0.30)
+  infra.addChild(rail)
+
   // ── Y-sorted objects ───────────────────────────────────────────
   // Bamboo back row (taller, further back by Y)
   const bambBack: [number, number][] = [
@@ -54,6 +59,9 @@ export function buildZone2Bamboo(layers: ZoneLayers, ctx: RenderCtx): void {
   bambFore.forEach(([bx, sc]) => {
     const b = ctx.nsp(...NA.BAMB_SM); b.anchor.set(0.5, 1); b.x = bx; b.y = GY; b.scale.set(sc); ysort.addChild(b)
   })
+
+  // Stone lantern at trail entrance
+  const lanZ2 = makeStoneLantern(); lanZ2.x = 547; lanZ2.y = GY; ysort.addChild(lanZ2)
 
   // Rocks scattered around grove
   const rk1 = ctx.nsp(...NA.ROCK_MED); rk1.anchor.set(0.5, 1); rk1.x = 660;  rk1.y = GY;    rk1.scale.set(0.55); ysort.addChild(rk1)

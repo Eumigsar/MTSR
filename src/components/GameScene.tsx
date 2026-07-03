@@ -109,19 +109,26 @@ export function GameScene() {
         spr: PIXI.AnimatedSprite; leftFrames: PIXI.Texture[]; rightFrames: PIXI.Texture[]
       }
       const walkers: WalkNPC[] = []
+      // charIdx map — chars-atlas1.png: 0=grandma_zhang 1=hua_lan 2=wen_bo 3=little_wu 4=jade 5=red
       const npcZones = [
-        { x: 230,  min: 130,  max: 420  },
-        { x: 1180, min: 1140, max: 1280 },
-        { x: 1350, min: 1280, max: 1470 },
-        { x: 1420, min: 1340, max: 1560 },
-        { x: 1500, min: 1380, max: 1580 },
-        { x: 2380, min: 2290, max: 2530 },
+        { x:  350, min:  280, max:  470, charIdx: 2 }, // wen_bo disciple  — Zone 1
+        { x:   80, min:   60, max:  150, charIdx: 5 }, // red guard west   — Zone 1 gate
+        { x:  490, min:  460, max:  530, charIdx: 5 }, // red guard east   — Zone 1 gate
+        { x:  650, min:  580, max:  780, charIdx: 4 }, // jade pilgrim     — Zone 2 west
+        { x:  900, min:  820, max:  980, charIdx: 4 }, // jade pilgrim     — Zone 2 east
+        { x: 1200, min: 1160, max: 1280, charIdx: 0 }, // grandma_zhang    — Zone 3 market
+        { x: 1380, min: 1340, max: 1430, charIdx: 1 }, // hua_lan          — Zone 3 library
+        { x: 1480, min: 1440, max: 1520, charIdx: 3 }, // little_wu        — Zone 3 stalls
+        { x: 1750, min: 1680, max: 1850, charIdx: 4 }, // jade pilgrim     — Zone 4 lower
+        { x: 1960, min: 1900, max: 2060, charIdx: 4 }, // jade pilgrim     — Zone 4 upper
+        { x: 2260, min: 2220, max: 2320, charIdx: 5 }, // red guard west   — Zone 5
+        { x: 2590, min: 2540, max: 2650, charIdx: 5 }, // red guard east   — Zone 5
       ]
       npcZones.forEach((z, i) => {
         const wc = new PIXI.Container()
         wc.x = z.x; wc.y = GY
-        const leftFrames  = mkAtlasFrames(chars1Tex, i, 1)
-        const rightFrames = mkAtlasFrames(chars1Tex, i, 3)
+        const leftFrames  = mkAtlasFrames(chars1Tex, z.charIdx, 1)
+        const rightFrames = mkAtlasFrames(chars1Tex, z.charIdx, 3)
         const initRight = i % 2 === 0
         const wSpr = new PIXI.AnimatedSprite(initRight ? rightFrames : leftFrames)
         wSpr.anchor.set(0.5, 1); wSpr.scale.set(0.625); wSpr.play()

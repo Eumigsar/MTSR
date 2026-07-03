@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js'
 import { GY, K } from '../constants'
 import { BA, NA } from '../../engine/AtlasRegistry'
-import { drawStoneWall, drawLantern, makeIncenseBurner } from '../drawHelpers'
+import { drawStoneWall, drawLantern, makeIncenseBurner, makeStoneLantern } from '../drawHelpers'
 import type { RenderCtx, ZoneLayers } from '../../engine/types'
 
 // ─── Zone 5 — Temple (x: 2160–2700) ─────────────────────────────────────────
@@ -72,6 +72,13 @@ export function buildZone5Temple(layers: ZoneLayers, ctx: RenderCtx): void {
   gateT.anchor.set(0.5, 0.5); gateT.x = 2280; gateT.y = GY - 212; infra.addChild(gateT)
 
   // ── Y-sorted objects ───────────────────────────────────────────
+  // Arch passage at zone entrance
+  const arch = ctx.bsp(...BA.ARCH_OPEN); arch.anchor.set(0.5, 1); arch.x = 2163; arch.y = GY; arch.scale.set(0.88); ysort.addChild(arch)
+
+  // Stone lanterns flanking the gate approach
+  const sl1 = makeStoneLantern(); sl1.x = 2248; sl1.y = GY; ysort.addChild(sl1)
+  const sl2 = makeStoneLantern(); sl2.x = 2318; sl2.y = GY; ysort.addChild(sl2)
+
   const gate   = ctx.bsp(...BA.GATE_SM);  gate.anchor.set(0.5, 1);  gate.x   = 2280; gate.y   = GY;      gate.scale.set(1.05);  ysort.addChild(gate)
   const bell   = ctx.bsp(...BA.FAC_NARR); bell.anchor.set(0, 1);    bell.x   = 2210; bell.y   = GY - 30; bell.scale.set(0.88);  ysort.addChild(bell)
   const temple = ctx.bsp(...BA.FAC_WIDE); temple.anchor.set(0, 1);  temple.x = 2345; temple.y = GY;      temple.scale.set(1.12); ysort.addChild(temple)

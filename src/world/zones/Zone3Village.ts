@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js'
 import { GY, rng, K } from '../constants'
 import { BA, NA } from '../../engine/AtlasRegistry'
-import { drawWater, drawLantern, drawSign } from '../drawHelpers'
+import { drawWater, drawLantern, drawSign, makeWell } from '../drawHelpers'
 import type { RenderCtx, ZoneLayers } from '../../engine/types'
 
 // ─── Zone 3 — Village (x: 1080–1620) ─────────────────────────────────────────
@@ -60,6 +60,11 @@ export function buildZone3Village(layers: ZoneLayers, ctx: RenderCtx): void {
   drawLantern(infra, 1170, 700); drawLantern(infra, 1320, 700)
   drawLantern(infra, 1470, 700); drawLantern(infra, 1600, 700)
 
+  // Red decorative railing in front of library
+  const redRail = ctx.bsp(...BA.RAILING_RED)
+  redRail.anchor.set(0.5, 1); redRail.x = 1250; redRail.y = GY; redRail.scale.set(1.0)
+  infra.addChild(redRail)
+
   // Library steps
   const libSteps = new PIXI.Graphics()
   libSteps.rect(1330, GY - 54, 80, 8).fill(K.stoneL)
@@ -72,6 +77,9 @@ export function buildZone3Village(layers: ZoneLayers, ctx: RenderCtx): void {
 
   const lib = ctx.bsp(...BA.FAC_B1); lib.anchor.set(0, 1); lib.x = 1285; lib.y = GY - 50; lib.scale.set(1.18); ysort.addChild(lib)
   mkS('書院', 1375, GY - 192)
+
+  // Village well at courtyard center
+  const well = makeWell(); well.x = 1350; well.y = GY; ysort.addChild(well)
 
   const oak1 = ctx.nsp(...NA.BONSAI_2); oak1.anchor.set(0.5, 1); oak1.x = 1086; oak1.y = GY; oak1.scale.set(0.75); ysort.addChild(oak1)
   const ch1  = ctx.nsp(...NA.CHERRY_2); ch1.anchor.set(0.5, 1);  ch1.x  = 1610; ch1.y  = GY; ch1.scale.set(0.80);  ysort.addChild(ch1)

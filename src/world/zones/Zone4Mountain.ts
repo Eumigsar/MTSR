@@ -1,7 +1,7 @@
 import * as PIXI from 'pixi.js'
 import { GY, K } from '../constants'
 import { NA } from '../../engine/AtlasRegistry'
-import { drawDirt, drawStoneWall, drawSign } from '../drawHelpers'
+import { drawDirt, drawStoneWall, drawSign, makeIncenseBurner, makeStoneLantern } from '../drawHelpers'
 import type { RenderCtx, ZoneLayers } from '../../engine/types'
 
 // ─── Zone 4 — Mountain Path (x: 1620–2160) ───────────────────────────────────
@@ -78,6 +78,13 @@ export function buildZone4Mountain(layers: ZoneLayers, ctx: RenderCtx): void {
   const tr5 = ctx.nsp(...NA.BONSAI_1); tr5.anchor.set(0.5, 1); tr5.x = 2120; tr5.y = GY - 140; tr5.scale.set(0.82); ysort.addChild(tr5)
 
   // Rocks along the path and near waterfall
+  // Stone lanterns marking the trail at start and near summit
+  const lanA = makeStoneLantern(); lanA.x = 1645; lanA.y = GY;       ysort.addChild(lanA)
+  const lanB = makeStoneLantern(); lanB.x = 2102; lanB.y = GY - 148; ysort.addChild(lanB)
+
+  // Mountain waypoint altar — incense burner on the slope
+  const altar = makeIncenseBurner(); altar.x = 1875; altar.y = GY - 130; ysort.addChild(altar)
+
   const rk1 = ctx.nsp(...NA.ROCK_LG);  rk1.anchor.set(0.5, 1); rk1.x = 1670; rk1.y = GY;       rk1.scale.set(0.80); ysort.addChild(rk1)
   const rk2 = ctx.nsp(...NA.ROCK_MED); rk2.anchor.set(0.5, 1); rk2.x = 1750; rk2.y = GY - 65;  rk2.scale.set(0.62); ysort.addChild(rk2)
   const rk3 = ctx.nsp(...NA.ROCK_LG);  rk3.anchor.set(0.5, 1); rk3.x = 1860; rk3.y = GY - 138; rk3.scale.set(0.85); ysort.addChild(rk3)
