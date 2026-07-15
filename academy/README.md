@@ -52,6 +52,17 @@ const sync = createCultivationSync(supabase, characterId); // no-op se ambos fal
 Sem `supabase` (modo demo) ou sem `characterId`, `sync.enabled === false` e todos
 os métodos resolvem sem tocar a rede — o app segue no localStorage.
 
+**No MATSU-RI (este repo)** o wiring já está pronto em `src/academy/`:
+`useCultivationSync` puxa o personagem do `gameStore` (pulando contas demo) e
+`AcademyPatio` é um drop-in que carrega o XP do Supabase e repassa os eventos.
+Basta montar onde quiser um botão de Academia:
+
+```tsx
+import AcademyPatio from './academy/AcademyPatio'
+// ... em algum lugar da UI do jogo:
+{showAcademy && <AcademyPatio />}
+```
+
 Ou consumindo só os dados/lógica em outro renderizador:
 
 ```ts
