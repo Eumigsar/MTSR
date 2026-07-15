@@ -9,6 +9,7 @@ import { LearningModal }      from './components/LearningModal'
 import { CharacterPanel }     from './components/CharacterPanel'
 import { InventoryPanel }     from './components/InventoryPanel'
 import { TalentTreePanel }    from './components/TalentTreePanel'
+import { AcademyPanel }       from './components/AcademyPanel'
 import { MissionRewardModal } from './components/MissionRewardModal'
 
 const DEMO_CHARACTER = {
@@ -133,6 +134,7 @@ export default function App() {
       {activePanel === 'character' && <CharacterPanel />}
       {activePanel === 'inventory' && <InventoryPanel />}
       {activePanel === 'talents'   && <TalentTreePanel />}
+      {activePanel === 'academy'   && <AcademyPanel />}
 
       {/* Modals */}
       {activeLearning  && <LearningModal hanzi={activeLearning} />}

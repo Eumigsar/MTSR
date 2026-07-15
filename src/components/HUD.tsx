@@ -131,13 +131,21 @@ export function HUD() {
             </span>
           )}
         </button>
+
+        <button
+          onClick={() => togglePanel('academy')}
+          className={`w-11 h-11 rounded-full flex items-center justify-center shadow-lg transition-all border-2 ${activePanel === 'academy' ? 'bg-matsuri-imperial border-matsuri-gold' : 'bg-matsuri-ink/90 border-white/10 hover:border-matsuri-imperial'}`}
+          title="Academia — Pátio de Treino"
+        >
+          <span className="text-base font-display text-matsuri-paper">武</span>
+        </button>
       </div>
 
       {/* ── Bottom center: Controls hint ─────────────────── */}
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
         <div className="bg-matsuri-ink/60 backdrop-blur-sm rounded-full px-4 py-1.5">
           <p className="text-[9px] text-matsuri-paper/40 tracking-widest uppercase">
-            WASD / ↑↓←→ mover · Clique nos orbes · 👤🎒🌳 painéis
+            WASD / ↑↓←→ mover · Clique nos orbes · 👤🎒🌳武 painéis
           </p>
         </div>
       </div>

@@ -52,7 +52,7 @@ export interface MissionReward {
   flavor: string
 }
 
-export type ActivePanel = 'character' | 'inventory' | 'talents' | null
+export type ActivePanel = 'character' | 'inventory' | 'talents' | 'academy' | null
 export type GameMode    = 'auth' | 'world' | 'combat' | 'dialogue' | 'learning'
 export type FeedbackState = 'idle' | 'correct' | 'wrong'
 
