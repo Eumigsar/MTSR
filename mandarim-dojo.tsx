@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import PatioTreino from "./academy/PatioTreino";
 
 // =====================================================================
 //  MANDARIM DOJO — agora com um "Sifu Agent" que decide a sessão sozinho
@@ -422,6 +423,7 @@ export default function MandarimDojo() {
   const [sessionResults, setSessionResults] = useState({ acertos: 0, erros: 0 });
   const [sessionAttempts, setSessionAttempts] = useState([]);
   const [error, setError] = useState(null);
+  const [view, setView] = useState("dojo"); // dojo (SRS) | patio (Forma/Cultivo)
 
   // Sub-fluxo de marcação de erro
   const [tagging, setTagging] = useState(false);      // mostrando "onde travou?"
@@ -600,6 +602,24 @@ export default function MandarimDojo() {
           </p>
         </header>
 
+        <nav style={styles.tabBar}>
+          <button
+            style={{ ...styles.tab, ...(view === "dojo" ? styles.tabActive : {}) }}
+            onClick={() => setView("dojo")}
+          >
+            复习 · Revisão
+          </button>
+          <button
+            style={{ ...styles.tab, ...(view === "patio" ? styles.tabActive : {}) }}
+            onClick={() => setView("patio")}
+          >
+            练武 · Pátio de Treino
+          </button>
+        </nav>
+
+        {view === "patio" && <PatioTreino />}
+
+        {view === "dojo" && (<>
         <div style={styles.beltBar}>
           <div style={styles.beltTrack}>
             <div
@@ -789,10 +809,13 @@ export default function MandarimDojo() {
             <button style={styles.revealBtn} onClick={beginBriefing}>Ver plano da próxima sessão</button>
           </div>
         )}
+        </>)}
 
-        <footer style={styles.footer}>
-          O Sifu decide sozinho o que priorizar: lê seu histórico de erros (tom, radical, significado), agenda por repetição espaçada (1 → 3 → 7 → 16 → 35 dias) e forja frases novas quando você consolida um grupo. Cada erro zera a caixa, sem culpa.
-        </footer>
+        {view === "dojo" && (
+          <footer style={styles.footer}>
+            O Sifu decide sozinho o que priorizar: lê seu histórico de erros (tom, radical, significado), agenda por repetição espaçada (1 → 3 → 7 → 16 → 35 dias) e forja frases novas quando você consolida um grupo. Cada erro zera a caixa, sem culpa.
+          </footer>
+        )}
       </div>
     </div>
   );
@@ -830,6 +853,20 @@ const styles = {
     lineHeight: 1.5,
     margin: 0,
   },
+  tabBar: { display: "flex", gap: 8, marginBottom: 18 },
+  tab: {
+    flex: 1,
+    background: "#221D17",
+    color: "#9E9484",
+    border: "1px solid #3A3226",
+    borderRadius: 999,
+    padding: "9px 10px",
+    fontFamily: "'Helvetica Neue', Arial, sans-serif",
+    fontWeight: 700,
+    fontSize: 12.5,
+    cursor: "pointer",
+  },
+  tabActive: { background: "#2A1E22", color: "#F2C230", borderColor: "#5B2C3E" },
   beltBar: { marginBottom: 20 },
   beltTrack: {
     height: 8,
