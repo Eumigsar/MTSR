@@ -18,3 +18,5 @@ export {
   stageAdvanced,
 } from "./cultivation";
 export { checkTone, checkGrammar, sifuGreeting } from "./sifuEngine";
+export { createCultivationSync, cultivationRowFor } from "./cultivationSync";
+export type { CultivationSync, SyncResult, MartialReviewPatch } from "./cultivationSync";

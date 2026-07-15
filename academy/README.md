@@ -15,6 +15,7 @@ camada 3D Babylon.js. Zero backend obrigatório; persistência opcional via
 | `forms.ts` | Forma 梅花拳 (Mei Hua Quan) como sequência de 12 movimentos jogáveis | dados |
 | `cultivation.ts` | Sistema de Cultivo — Reino 1 (筑基 Fundação), 5 estágios, curva de XP | dados + lógica pura |
 | `sifuEngine.ts` | Sifu virtual híbrido: diálogo roteirizado + regras de tom/gramática (sem GPT pago) | lógica pura |
+| `cultivationSync.ts` | Ponte opcional academy ⇄ Supabase (migração 003). No-op seguro sem client. | lógica |
 | `PatioTreino.tsx` | Pátio de Treino jogável (React, identidade preto/dourado/vinho) | UI |
 | `index.ts` | Reexporta tudo | barrel |
 
@@ -29,6 +30,27 @@ import PatioTreino from "./academy/PatioTreino";
 // Plugando persistência externa (Supabase/Pocketbase) sem tocar no componente:
 <PatioTreino initialXp={xpDoBanco} onXpChange={(xp) => salvarNoSupabase(xp)} />
 ```
+
+### Persistindo no Supabase (opcional)
+
+O `PatioTreino` é offline-first (localStorage). Para sincronizar com o Supabase
+(migração `003_academy_cultivation.sql`), o **host** cria o sync e conecta os
+hooks — o componente não importa o client, então continua portátil:
+
+```tsx
+import { supabase } from "../src/lib/supabaseClient";
+import { createCultivationSync } from "./academy";
+
+const sync = createCultivationSync(supabase, characterId); // no-op se ambos faltarem
+
+<PatioTreino
+  onXpEvent={(source, amount) => sync.recordXp(source, amount)}
+  onFormComplete={(formId) => sync.recordFormCompletion(formId)}
+/>
+```
+
+Sem `supabase` (modo demo) ou sem `characterId`, `sync.enabled === false` e todos
+os métodos resolvem sem tocar a rede — o app segue no localStorage.
 
 Ou consumindo só os dados/lógica em outro renderizador:
 

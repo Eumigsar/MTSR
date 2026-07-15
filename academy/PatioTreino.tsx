@@ -3,7 +3,7 @@ import { MEI_HUA_QUAN, formCompletionXp } from "./forms";
 import { vocabById } from "./martialVocab";
 import { FOUNDATION_REALM, stageForXp, progressToNext, stageAdvanced, XP_TABLE } from "./cultivation";
 import { sifuGreeting, checkTone } from "./sifuEngine";
-import type { Tone } from "./types";
+import type { Tone, XpSource } from "./types";
 
 // =====================================================================
 //  Pátio de Treino (练武场) — MVP-1 jogável
@@ -34,10 +34,12 @@ const TONE_COLOR: Record<Tone, string> = {
 
 export interface PatioTreinoProps {
   initialXp?: number;
-  onXpChange?: (xp: number) => void; // hook para persistir em Supabase/Pocketbase
+  onXpChange?: (xp: number) => void;                          // total atualizado (persistir estado)
+  onXpEvent?: (source: XpSource, amount: number) => void;     // evento granular (→ cultivationSync)
+  onFormComplete?: (formId: string) => void;                  // Forma concluída (→ cultivationSync)
 }
 
-export default function PatioTreino({ initialXp, onXpChange }: PatioTreinoProps) {
+export default function PatioTreino({ initialXp, onXpChange, onXpEvent, onFormComplete }: PatioTreinoProps) {
   const [xp, setXp] = useState<number>(() => initialXp ?? loadXp());
   const [moveIdx, setMoveIdx] = useState(0);
   const [started, setStarted] = useState(false);
@@ -51,12 +53,13 @@ export default function PatioTreino({ initialXp, onXpChange }: PatioTreinoProps)
   const prog = useMemo(() => progressToNext(xp, FOUNDATION_REALM), [xp]);
   const greeting = useMemo(() => sifuGreeting(stage.name_pt), [stage.name_pt]);
 
-  const grantXp = (amount: number) => {
+  const grantXp = (amount: number, source: XpSource) => {
     const next = xp + amount;
     const climbed = stageAdvanced(xp, next, FOUNDATION_REALM);
     setXp(next);
     saveXp(next);
     onXpChange?.(next);
+    onXpEvent?.(source, amount); // evento granular para o cultivationSync
     if (climbed) setAdvancedTo(`${climbed.han} · ${climbed.name_pt}`);
   };
 
@@ -68,7 +71,8 @@ export default function PatioTreino({ initialXp, onXpChange }: PatioTreinoProps)
     } else {
       setFinished(true);
       setStarted(false);
-      grantXp(formCompletionXp(form)); // Forma completa concede XP de Cultivo
+      grantXp(formCompletionXp(form), "forma"); // Forma completa concede XP de Cultivo
+      onFormComplete?.(form.id);
     }
   };
   const prevMove = () => setMoveIdx(Math.max(0, moveIdx - 1));
@@ -79,7 +83,7 @@ export default function PatioTreino({ initialXp, onXpChange }: PatioTreinoProps)
     if (!drillTerm) return;
     const v = checkTone(drillTerm.tone, t, xp);
     setToneDrill({ verdict: `${v.line_zh} — ${v.line_pt}${v.corrections[0] ? " (" + v.corrections[0] + ")" : ""}`, ok: v.ok });
-    if (v.ok) grantXp(XP_TABLE.sifu);
+    if (v.ok) grantXp(XP_TABLE.sifu, "sifu");
   };
 
   return (
