@@ -63,6 +63,16 @@ export function createAcademyScene(engine: Engine, canvas: HTMLCanvasElement, op
     return { id: spec.id, han: spec.han, node };
   });
 
+  // Idle: respiração/oscilação suave, com fase própria por mestre.
+  let t = 0;
+  scene.onBeforeRenderObservable.add(() => {
+    t += engine.getDeltaTime() / 1000;
+    masters.forEach((m, i) => {
+      m.node.position.y = Math.abs(Math.sin(t * 1.1 + i * 1.3)) * 0.05; // flutua só p/ cima
+      m.node.rotation.y = Math.sin(t * 0.45 + i) * 0.07;                // leve balanço
+    });
+  });
+
   // Picking: clicar num mestre dispara onPickMaster com o id.
   if (opts.onPickMaster) {
     scene.onPointerObservable.add((info) => {
