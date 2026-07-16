@@ -1,6 +1,12 @@
 import React, { useMemo, useState } from "react";
 import { MEI_HUA_QUAN, formCompletionXp } from "./forms";
 import { vocabById } from "./martialVocab";
+import {
+  dueMartialTerms, reviewMartialTerm, loadMartialProgress, saveMartialProgress,
+  martialConsolidated, type MartialProgressMap,
+} from "./martialSrs";
+import type { MartialReviewPatch } from "./cultivationSync";
+import { MARTIAL_VOCAB } from "./martialVocab";
 import { FOUNDATION_REALM, stageForXp, progressToNext, stageAdvanced, XP_TABLE } from "./cultivation";
 import { sifuGreeting, checkTone } from "./sifuEngine";
 import type { Tone, XpSource } from "./types";
@@ -37,15 +43,25 @@ export interface PatioTreinoProps {
   onXpChange?: (xp: number) => void;                          // total atualizado (persistir estado)
   onXpEvent?: (source: XpSource, amount: number) => void;     // evento granular (→ cultivationSync)
   onFormComplete?: (formId: string) => void;                  // Forma concluída (→ cultivationSync)
+  onMartialReview?: (termId: string, patch: MartialReviewPatch) => void; // revisão marcial (→ cultivationSync)
 }
 
-export default function PatioTreino({ initialXp, onXpChange, onXpEvent, onFormComplete }: PatioTreinoProps) {
+export default function PatioTreino({ initialXp, onXpChange, onXpEvent, onFormComplete, onMartialReview }: PatioTreinoProps) {
   const [xp, setXp] = useState<number>(() => initialXp ?? loadXp());
   const [moveIdx, setMoveIdx] = useState(0);
   const [started, setStarted] = useState(false);
   const [finished, setFinished] = useState(false);
   const [advancedTo, setAdvancedTo] = useState<string | null>(null);
   const [toneDrill, setToneDrill] = useState<{ verdict: string; ok: boolean } | null>(null);
+
+  // ── Sub-modo: Forma (套路) vs Deck Marcial (词库) ──
+  const [subView, setSubView] = useState<"forma" | "deck">("forma");
+  const [mProg, setMProg] = useState<MartialProgressMap>(() => loadMartialProgress());
+  const [mQueue, setMQueue] = useState<typeof MARTIAL_VOCAB>([]);
+  const [mIdx, setMIdx] = useState(0);
+  const [mRevealed, setMRevealed] = useState(false);
+  const [mDone, setMDone] = useState(false);
+  const [mResults, setMResults] = useState({ ok: 0, no: 0 });
 
   const form = MEI_HUA_QUAN;
   const move = form.moves[moveIdx];
@@ -86,6 +102,24 @@ export default function PatioTreino({ initialXp, onXpChange, onXpEvent, onFormCo
     if (v.ok) grantXp(XP_TABLE.sifu, "sifu");
   };
 
+  // ── Deck Marcial (SRS sobre o banco marcial) ──
+  const mCard = mQueue[mIdx];
+  const startDeck = () => {
+    setMQueue(dueMartialTerms(mProg));
+    setMIdx(0); setMRevealed(false); setMDone(false); setMResults({ ok: 0, no: 0 });
+  };
+  const answerMartial = (correct: boolean) => {
+    const card = mQueue[mIdx];
+    const { map, patch } = reviewMartialTerm(mProg, card.id, correct);
+    setMProg(map);
+    saveMartialProgress(map);
+    onMartialReview?.(card.id, patch);
+    if (correct) grantXp(XP_TABLE.vocab, "vocab"); // termo marcial reforçado → XP de Cultivo
+    setMResults((r) => ({ ok: r.ok + (correct ? 1 : 0), no: r.no + (correct ? 0 : 1) }));
+    if (mIdx + 1 < mQueue.length) { setMIdx(mIdx + 1); setMRevealed(false); }
+    else setMDone(true);
+  };
+
   return (
     <div style={S.page}>
       <div style={S.container}>
@@ -114,6 +148,14 @@ export default function PatioTreino({ initialXp, onXpChange, onXpEvent, onFormCo
           <div style={S.sifuPt}>{greeting.line_pt}</div>
         </div>
 
+        {/* Sub-nav: Forma vs Deck Marcial */}
+        <div style={S.subNav}>
+          <button style={{ ...S.subTab, ...(subView === "forma" ? S.subTabActive : {}) }} onClick={() => setSubView("forma")}>套路 · Forma</button>
+          <button style={{ ...S.subTab, ...(subView === "deck" ? S.subTabActive : {}) }} onClick={() => setSubView("deck")}>词库 · Deck Marcial</button>
+        </div>
+
+        {/* ===================== FORMA ===================== */}
+        {subView === "forma" && (<>
         {/* Estado inicial / concluído */}
         {!started && (
           <div style={S.card}>
@@ -176,6 +218,57 @@ export default function PatioTreino({ initialXp, onXpChange, onXpEvent, onFormCo
         {!form.choreographyVerified && (
           <div style={S.warn}>⚠️ Coreografia ainda não validada por praticante de Choy Lay Fut (playtest da Amanda — ver PENDENTE-AMANDA.md).</div>
         )}
+        </>)}
+
+        {/* ===================== DECK MARCIAL ===================== */}
+        {subView === "deck" && (<>
+          {mQueue.length === 0 && !mDone && (
+            <div style={S.card}>
+              <p style={S.doneNote}>
+                Revisão espaçada do vocabulário marcial (posturas, golpes, virtude...).
+                {" "}<b style={{ color: "#F2C230" }}>{martialConsolidated(mProg)}/{MARTIAL_VOCAB.length}</b> consolidados.
+              </p>
+              <button style={S.primaryBtn} onClick={startDeck}>开始 · Iniciar revisão</button>
+            </div>
+          )}
+
+          {mQueue.length > 0 && !mDone && mCard && (
+            <div style={S.card}>
+              <div style={S.moveCount}>{mIdx + 1} / {mQueue.length}</div>
+              <div style={S.moveHanRow}>
+                <span style={{ ...S.moveHan, color: TONE_COLOR[mCard.tone] }}>{mCard.han}</span>
+                {mCard.tone > 0 && <span style={{ ...S.breath, background: TONE_COLOR[mCard.tone] }}>tom {mCard.tone}</span>}
+              </div>
+
+              {!mRevealed ? (
+                <button style={S.primaryBtn} onClick={() => setMRevealed(true)}>Revelar</button>
+              ) : (
+                <>
+                  <div style={S.movePinyin}>{mCard.pinyin} — {mCard.meaning_pt}</div>
+                  <div style={S.vocabRow}>
+                    {mCard.radicals.map((r, i) => <span key={i} style={S.vocabChip}>{r}</span>)}
+                  </div>
+                  <div style={S.drill}><div style={S.drillVerdict as React.CSSProperties}>{mCard.anchor}</div></div>
+                  <div style={S.navRow}>
+                    <button style={S.ghostBtn} onClick={() => answerMartial(false)}>Ainda travei</button>
+                    <button style={S.primaryBtn} onClick={() => answerMartial(true)}>Já domino</button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {mDone && (
+            <div style={S.card}>
+              <div style={S.doneTitle}>词库 — Revisão encerrada</div>
+              <p style={S.doneNote}>
+                <b style={{ color: "#D9EFDA" }}>{mResults.ok}</b> dominados · <b style={{ color: "#E8B4B4" }}>{mResults.no}</b> voltam pra caixa 0.
+                {" "}Consolidados: <b style={{ color: "#F2C230" }}>{martialConsolidated(mProg)}/{MARTIAL_VOCAB.length}</b>.
+              </p>
+              <button style={S.primaryBtn} onClick={startDeck}>Nova revisão</button>
+            </div>
+          )}
+        </>)}
       </div>
     </div>
   );
@@ -189,6 +282,9 @@ const S: Record<string, React.CSSProperties> = {
   title: { fontSize: 32, margin: "0 0 6px", fontWeight: 700, color: "#F2C230" },
   titlePinyin: { fontSize: 16, color: "#C9BFAE", fontFamily: "'Helvetica Neue', Arial, sans-serif" },
   subtitle: { fontFamily: "'Helvetica Neue', Arial, sans-serif", fontSize: 13, color: "#C9BFAE", margin: 0 },
+  subNav: { display: "flex", gap: 8, marginBottom: 14 },
+  subTab: { flex: 1, background: "#221D17", color: "#9E9484", border: "1px solid #3A3226", borderRadius: 999, padding: "8px 10px", fontFamily: "'Helvetica Neue', Arial, sans-serif", fontWeight: 700, fontSize: 12, cursor: "pointer" },
+  subTabActive: { background: "#2A1E22", color: "#F2C230", borderColor: "#5B2C3E" },
   cultivoBar: { background: "#221D17", border: "1px solid #3A3226", borderRadius: 12, padding: "12px 14px", marginBottom: 14 },
   cultivoTop: { display: "flex", justifyContent: "space-between", fontFamily: "'Helvetica Neue', Arial, sans-serif", fontSize: 12, marginBottom: 8 },
   cultivoRealm: { color: "#9E9484" },

@@ -16,6 +16,7 @@ camada 3D Babylon.js. Zero backend obrigatório; persistência opcional via
 | `cultivation.ts` | Sistema de Cultivo — Reino 1 (筑基 Fundação), 5 estágios, curva de XP | dados + lógica pura |
 | `sifuEngine.ts` | Sifu virtual híbrido: diálogo roteirizado + regras de tom/gramática (sem GPT pago) | lógica pura |
 | `cultivationSync.ts` | Ponte opcional academy ⇄ Supabase (migração 003). No-op seguro sem client. | lógica |
+| `martialSrs.ts` | SRS Leitner sobre o banco marcial (Deck Marcial do Pátio) | dados + lógica pura |
 | `PatioTreino.tsx` | Pátio de Treino jogável (React, identidade preto/dourado/vinho) | UI |
 | `index.ts` | Reexporta tudo | barrel |
 
@@ -85,4 +86,5 @@ MEI_HUA_QUAN.moves.forEach(m => render(m)); // sequência da Forma
 - `academy/*.ts` passam `tsc --strict` com 0 erros.
 - `academy/*.tsx` passam bundle `esbuild` (tipos de `react` exigem
   `npm install` — ainda não instalado neste clone).
-- Lógica coberta por 21 testes funcionais (Cultivo, Forma, Sifu, vocab).
+- Suíte executável: **`npm test`** (ou `node academy/tests.mjs`) — 24 testes
+  cobrindo vocab, Forma, Cultivo, Sifu, sync (no-op) e SRS marcial.

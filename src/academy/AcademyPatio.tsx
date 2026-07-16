@@ -33,6 +33,7 @@ export default function AcademyPatio() {
       initialXp={initialXp}
       onXpEvent={(source, amount) => { void sync.recordXp(source, amount) }}
       onFormComplete={(formId) => { void sync.recordFormCompletion(formId) }}
+      onMartialReview={(termId, patch) => { void sync.recordMartialReview(termId, patch) }}
     />
   )
 }

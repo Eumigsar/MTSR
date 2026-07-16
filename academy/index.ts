@@ -19,4 +19,10 @@ export {
 } from "./cultivation";
 export { checkTone, checkGrammar, sifuGreeting } from "./sifuEngine";
 export { createCultivationSync, cultivationRowFor } from "./cultivationSync";
+export {
+  dueMartialTerms, reviewMartialTerm, isMartialDue, martialConsolidated,
+  freshMartialProgress, loadMartialProgress, saveMartialProgress,
+  MARTIAL_BOX_INTERVALS,
+} from "./martialSrs";
+export type { MartialProgress, MartialProgressMap, MartialReviewOutcome } from "./martialSrs";
 export type { CultivationSync, SyncResult, MartialReviewPatch } from "./cultivationSync";
