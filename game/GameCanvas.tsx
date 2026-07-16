@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { Engine, Vector3, Matrix } from "@babylonjs/core";
 import { createAcademyScene, type AcademySceneHandle } from "./AcademyScene";
 import { masterById, type CharacterSpec } from "./characterData";
+import { checkTone } from "../academy/sifuEngine";
+import type { Tone } from "../academy/types";
+
+const TONE_HEX: Record<number, string> = { 1: "#C9A227", 2: "#7B2D3E", 3: "#2F5233", 4: "#B3401F" };
 
 // =====================================================================
 //  GameCanvas — Engine Babylon + labels flutuantes + diálogo dos mestres
@@ -20,8 +24,18 @@ export default function GameCanvas() {
   const [labels, setLabels] = useState<{ id: string; han: string }[]>([]);
   const [active, setActive] = useState<CharacterSpec | null>(null);
   const [lineIdx, setLineIdx] = useState(0);
+  const [toneVerdict, setToneVerdict] = useState<{ text: string; ok: boolean } | null>(null);
+  const [breathStep, setBreathStep] = useState(0);
 
-  const openMaster = (id: string) => { setActive(masterById(id) ?? null); setLineIdx(0); };
+  const openMaster = (id: string) => {
+    setActive(masterById(id) ?? null);
+    setLineIdx(0); setToneVerdict(null); setBreathStep(0);
+  };
+
+  const guessTone = (expected: Tone, guess: Tone) => {
+    const v = checkTone(expected, guess, guess);
+    setToneVerdict({ text: `${v.line_zh} — ${v.line_pt}${v.corrections[0] ? " (" + v.corrections[0] + ")" : ""}`, ok: v.ok });
+  };
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -62,6 +76,7 @@ export default function GameCanvas() {
   }, []);
 
   const line = active?.speech[lineIdx % Math.max(active.speech.length, 1)];
+  const drill = active?.drill;
 
   return (
     <div style={{ position: "relative", width: "100%", height: "100%", overflow: "hidden", background: "#1A1612" }}>
@@ -104,6 +119,40 @@ export default function GameCanvas() {
             <div style={{ fontSize: 11, letterSpacing: "1px", color: "#C97A8C", textTransform: "uppercase", marginBottom: 10 }}>{active.role_pt}</div>
             <div style={{ fontFamily: "'Songti SC', Georgia, serif", fontSize: 19, color: "#F5EFE6", marginBottom: 4 }}>{line.zh}</div>
             <div style={{ fontSize: 13.5, color: "#E8D5DA", lineHeight: 1.5, marginBottom: 14 }}>{line.pt}</div>
+
+            {/* Drill de tom (花岚, 金财) */}
+            {drill && drill.kind === "tone" && (
+              <div style={{ background: "#1F1A15", border: "1px solid #3A3226", borderRadius: 10, padding: 12, marginBottom: 14 }}>
+                <div style={{ fontSize: 12.5, color: "#C9BFAE", marginBottom: 8 }}>
+                  Drill: qual o tom de <b style={{ color: "#F2C230", fontFamily: "'Songti SC', Georgia, serif" }}>{drill.han}</b> ({drill.pinyin.replace(/[āáǎàēéěèīíǐìōóǒòūúǔùǖǘǚǜ]/g, "·")})?
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {[1, 2, 3, 4].map((t) => (
+                    <button key={t} onClick={() => guessTone(drill.answer, t as Tone)}
+                      style={{ width: 44, height: 40, background: "#2A241D", border: `2px solid ${TONE_HEX[t]}`, color: TONE_HEX[t], borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: "pointer" }}>{t}</button>
+                  ))}
+                </div>
+                {toneVerdict && <div style={{ marginTop: 10, fontSize: 12.5, lineHeight: 1.5, color: toneVerdict.ok ? "#D9EFDA" : "#E8B4B4" }}>{toneVerdict.text}</div>}
+              </div>
+            )}
+
+            {/* Exercício de respiração (云道长) */}
+            {drill && drill.kind === "breathing" && (
+              <div style={{ background: "#1F1A15", border: "1px solid #3A3226", borderRadius: 10, padding: 12, marginBottom: 14, textAlign: "center" }}>
+                {breathStep >= drill.cycles * 2 ? (
+                  <div style={{ fontSize: 13, color: "#D9EFDA" }}>气沉丹田。 Respiração completa — {drill.cycles} ciclos. 心自静。</div>
+                ) : (
+                  <>
+                    <div style={{ fontFamily: "'Songti SC', Georgia, serif", fontSize: 30, color: breathStep % 2 === 0 ? "#C9A227" : "#7B2D3E", marginBottom: 4 }}>{breathStep % 2 === 0 ? "吸" : "呼"}</div>
+                    <div style={{ fontSize: 12.5, color: "#C9BFAE", marginBottom: 10 }}>
+                      {breathStep % 2 === 0 ? "Inspire, o qi desce ao dan tian…" : "Expire, solte a tensão…"} ({Math.floor(breathStep / 2) + 1}/{drill.cycles})
+                    </div>
+                    <button onClick={() => setBreathStep((s) => s + 1)} style={{ background: "#2A241D", color: "#C9BFAE", border: "1px solid #3A3226", borderRadius: 999, padding: "6px 16px", fontWeight: 700, fontSize: 13, cursor: "pointer" }}>{breathStep % 2 === 0 ? "呼 →" : "吸 →"}</button>
+                  </>
+                )}
+              </div>
+            )}
+
             <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
               {active.speech.length > 1 && (
                 <button

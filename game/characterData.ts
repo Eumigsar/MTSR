@@ -22,6 +22,11 @@ export interface SpeechLine {
   pt: string;
 }
 
+/** Exercício rápido que o mestre puxa, ligado ao Sifu híbrido (academy). */
+export type MasterDrill =
+  | { kind: "tone"; han: string; pinyin: string; answer: 1 | 2 | 3 | 4 }
+  | { kind: "breathing"; cycles: number };
+
 export interface CharacterSpec {
   id: string;
   han: string;
@@ -34,6 +39,8 @@ export interface CharacterSpec {
   object: HeldObject;
   /** Registro de fala próprio — usado por diálogos e pelo Sifu híbrido. */
   speech: SpeechLine[];
+  /** Exercício opcional que o mestre propõe (Sifu híbrido). */
+  drill?: MasterDrill;
   /** NPC 2D correspondente no MATSU-RI (public/assets/*_walk.png). */
   spriteRef?: string;
 }
@@ -69,6 +76,7 @@ export const MASTERS: CharacterSpec[] = [
       { zh: "声调如歌，起伏有情。", pt: "Os tons são canção — sobem e descem com emoção." },
       { zh: "三声下沉，再上扬。", pt: "O terceiro tom afunda, depois sobe de novo." },
     ],
+    drill: { kind: "tone", han: "花", pinyin: "huā", answer: 1 },
     spriteRef: "hua_lan_walk",
   },
   {
@@ -85,6 +93,7 @@ export const MASTERS: CharacterSpec[] = [
       { zh: "气沉丹田，心自静。", pt: "O qi assenta no dan tian; a mente se aquieta sozinha." },
       { zh: "无为而无不为。", pt: "Não force nada, e nada ficará por fazer." },
     ],
+    drill: { kind: "breathing", cycles: 3 },
   },
   {
     id: "popo",
@@ -116,6 +125,7 @@ export const MASTERS: CharacterSpec[] = [
       { zh: "一二三，数清楚才不吃亏！", pt: "Um, dois, três — conte direito pra não sair no prejuízo!" },
       { zh: "买卖公道，人心自来。", pt: "Comércio justo atrai as pessoas por si só." },
     ],
+    drill: { kind: "tone", han: "五", pinyin: "wǔ", answer: 3 },
   },
   {
     id: "xiaobao",
