@@ -123,8 +123,10 @@ function buildObject(scene: Scene, spec: CharacterSpec, bodyH: number): Abstract
       const handle = MeshBuilder.CreateCylinder(`${spec.id}-obj`, { height: 0.9, diameter: 0.06, tessellation: 8 }, scene);
       handle.position = side; paint(handle, scene, "#5A4632", `${spec.id}-obj`);
       const tuft = MeshBuilder.CreateSphere(`${spec.id}-obj-tuft`, { diameter: 0.3, segments: 8 }, scene);
-      tuft.position = side.add(new Vector3(0, 0.5, 0)); tuft.scaling.y = 1.4;
-      paint(tuft, scene, "#EDE7DA", `${spec.id}-obj-tuft`); tuft.parent = handle;
+      tuft.parent = handle;
+      tuft.position = new Vector3(0, 0.5, 0); // local ao cabo (evita offset duplo)
+      tuft.scaling.y = 1.4;
+      paint(tuft, scene, "#EDE7DA", `${spec.id}-obj-tuft`);
       return handle;
     }
     case "cane": {
