@@ -5,17 +5,29 @@
 //  CharacterFactory. Sem assets externos. API estável do Babylon.
 // =====================================================================
 
-import { Scene, Engine, ArcRotateCamera, HemisphericLight, MeshBuilder, StandardMaterial, Color3, Color4, Vector3 } from "@babylonjs/core";
+import { Scene, Engine, ArcRotateCamera, HemisphericLight, MeshBuilder, StandardMaterial, Color3, Color4, Vector3, PointerEventTypes, TransformNode } from "@babylonjs/core";
 import { MASTERS } from "./characterData";
 import { buildCharacter } from "./CharacterFactory";
 
+export interface PlacedMaster {
+  id: string;
+  han: string;
+  node: TransformNode;
+}
+
 export interface AcademySceneHandle {
   scene: Scene;
+  camera: ArcRotateCamera;
+  masters: PlacedMaster[];
   dispose(): void;
 }
 
+export interface AcademySceneOptions {
+  onPickMaster?: (id: string) => void;
+}
+
 /** Cria a cena da Academia dentro de um Engine já existente. */
-export function createAcademyScene(engine: Engine, canvas: HTMLCanvasElement): AcademySceneHandle {
+export function createAcademyScene(engine: Engine, canvas: HTMLCanvasElement, opts: AcademySceneOptions = {}): AcademySceneHandle {
   const scene = new Scene(engine);
   scene.clearColor = new Color4(0.10, 0.086, 0.071, 1); // #1A1612 (identidade do dojo)
 
@@ -41,17 +53,29 @@ export function createAcademyScene(engine: Engine, canvas: HTMLCanvasElement): A
 
   // Enfileira os 6 mestres em semicírculo, de frente para a câmera
   const n = MASTERS.length;
-  MASTERS.forEach((spec, i) => {
+  const masters: PlacedMaster[] = MASTERS.map((spec, i) => {
     const t = n > 1 ? i / (n - 1) : 0.5;
     const angle = Math.PI * (0.15 + 0.7 * t); // arco frontal
     const radius = 6;
     const x = Math.cos(angle) * radius;
     const z = Math.sin(angle) * radius - 1;
-    buildCharacter(scene, spec, new Vector3(x, 0, z));
+    const node = buildCharacter(scene, spec, new Vector3(x, 0, z));
+    return { id: spec.id, han: spec.han, node };
   });
+
+  // Picking: clicar num mestre dispara onPickMaster com o id.
+  if (opts.onPickMaster) {
+    scene.onPointerObservable.add((info) => {
+      if (info.type !== PointerEventTypes.POINTERPICK) return;
+      const id = info.pickInfo?.pickedMesh?.metadata?.masterId;
+      if (id) opts.onPickMaster!(id);
+    });
+  }
 
   return {
     scene,
+    camera,
+    masters,
     dispose: () => scene.dispose(),
   };
 }

@@ -74,6 +74,9 @@ export function buildCharacter(scene: Scene, spec: CharacterSpec, position = Vec
   const held = buildObject(scene, spec, s.h);
   if (held) held.parent = root;
 
+  // Marca todas as partes para o picking identificar o mestre clicado.
+  root.getChildMeshes().forEach((m) => { m.metadata = { masterId: spec.id }; });
+
   return root;
 }
 
