@@ -21,6 +21,11 @@ execFileSync("npx", [
 // martialSrs usa localStorage (guardado por try/catch) — não é tocado aqui.
 const A = await import(pathToFileURL(out).href);
 
+// Camada 3D: só os DADOS puros dos mestres (sem Babylon).
+const gout = join(dir, "chars.mjs");
+execFileSync("npx", ["esbuild", "game/characterData.ts", "--bundle", "--format=esm", `--outfile=${gout}`], { stdio: ["ignore", "ignore", "inherit"] });
+const G = await import(pathToFileURL(gout).href);
+
 let pass = 0, fail = 0;
 const t = (name, cond) => { cond ? pass++ : fail++; console.log((cond ? "✓" : "✗ FAIL") + " " + name); };
 
@@ -63,6 +68,13 @@ t("srs marcial: patch tem nextReviewAt ISO", /\d{4}-\d\d-\d\dT/.test(r1.patch.ne
 const r2 = A.reviewMartialTerm(r1.map, "mabu", false);
 t("srs marcial: erro zera a caixa", r2.map["mabu"].box === 0 && r2.map["mabu"].wrong === 1);
 t("srs marcial: consolidados começa em 0", A.martialConsolidated(fresh) === 0);
+
+// ---- Camada 3D: dados dos mestres ----
+t("game: 6 mestres", G.MASTERS.length === 6);
+t("game: ids únicos", new Set(G.MASTERS.map((m) => m.id)).size === 6);
+t("game: paletas hex válidas", G.MASTERS.every((m) => /^#[0-9A-Fa-f]{6}$/.test(m.palette.robe)));
+t("game: >=2 falas cada", G.MASTERS.every((m) => m.speech.length >= 2));
+t("game: 4 têm continuidade 2D (spriteRef)", G.MASTERS.filter((m) => m.spriteRef).length === 4);
 
 console.log(`\n${pass} passaram, ${fail} falharam`);
 process.exit(fail ? 1 : 0);

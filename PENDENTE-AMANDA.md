@@ -46,9 +46,15 @@ _Última atualização: 2026-07-15 · sessão MVP-1 (Academia Matsuri / Mandarim
 > Estes não são "decisões", são **fatos que faltam no repositório desta sessão**.
 > Ver as perguntas de despacho (Camada 2) no resumo da sessão.
 
-- [ ] A **camada 3D Babylon.js** (`/game`), o **`CharacterFactory.ts`** (6 mestres)
-      e o doc **`arquitetura-academia-kungfu.md`** (16 seções) **não existem
-      neste repositório** (`eumigsar/mtsr`). O que existe aqui é o RPG PixiJS
-      MATSU-RI (`src/`) + o `mandarim-dojo.tsx` (academia 2D). Por isso o MVP-1
-      foi feito como **módulos portáteis** (`academy/*`) que se plugam em
-      qualquer renderizador. **Onde vive o projeto canônico?**
+- [ ] O doc **`arquitetura-academia-kungfu.md`** (16 seções) **não existe neste
+      repositório** (`eumigsar/mtsr`). Trabalhei a partir do que descreveu no
+      chat. **Onde vive o projeto canônico?** (o MVP-1 foi feito como módulos
+      portáteis `academy/*` que se plugam em qualquer renderizador.)
+
+- [ ] **Smoke test da camada 3D (`/game`).** Criei o scaffold Babylon +
+      `CharacterFactory` (6 mestres procedurais), mas **este ambiente não tem
+      `node_modules`/navegador**, então NÃO consegui verificar contra a API real
+      do Babylon nem renderizar a cena. Rode localmente para validar:
+      `npm install && npm run dev` e monte `<GameCanvas />`. (Não precisa das
+      suas credenciais — é só uma limitação do ambiente desta sessão. Detalhes
+      em `game/README.md`.)
